@@ -1,0 +1,31 @@
+{
+  "experiment_id": "location-v1",
+  "model_ids": ["qwen3", "bge-m3", "e5", "embeddinggemma", "clap"],
+  "genres": ["rock", "jazz", "classical", "news", "pop", "electronic"],
+  "origins": [
+    {"name": "New York", "coordinates": {"latitude": 40.7, "longitude": -74.0}},
+    {"name": "Bogota", "coordinates": {"latitude": 4.7, "longitude": -74.1}},
+    {"name": "Sao Paulo", "coordinates": {"latitude": -23.6, "longitude": -46.6}},
+    {"name": "London", "coordinates": {"latitude": 51.5, "longitude": -0.1}},
+    {"name": "Lagos", "coordinates": {"latitude": 6.5, "longitude": 3.4}},
+    {"name": "Nairobi", "coordinates": {"latitude": -1.3, "longitude": 36.8}},
+    {"name": "Cairo", "coordinates": {"latitude": 30.0, "longitude": 31.2}},
+    {"name": "Mumbai", "coordinates": {"latitude": 19.1, "longitude": 72.9}},
+    {"name": "Singapore", "coordinates": {"latitude": 1.3, "longitude": 103.8}},
+    {"name": "Tokyo", "coordinates": {"latitude": 35.7, "longitude": 139.7}},
+    {"name": "Sydney", "coordinates": {"latitude": -33.9, "longitude": 151.2}},
+    {"name": "Johannesburg", "coordinates": {"latitude": -26.2, "longitude": 28.0}}
+  ],
+  "split_seeds": [1729, 2718, 3141],
+  "ridge_alphas": [0.01, 0.1, 1.0, 10.0, 100.0],
+  "block_degrees": 10.0,
+  "train_fraction": 0.6,
+  "validation_fraction": 0.2,
+  "neighbors": 10,
+  "bootstrap_replicates": 1000,
+  "bootstrap_seed": 1618,
+  "batch_size": 32,
+  "artifact_directory": "data/processed/location-v1",
+  "output_directory": "outputs/location-v1",
+  "geometry": {"earth_radius_km": 6371.0088}
+}

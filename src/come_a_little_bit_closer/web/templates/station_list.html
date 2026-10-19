@@ -1,0 +1,25 @@
+{% macro station_list(neighbors, kind) %}
+<ol class="station-list">
+  {% for station in neighbors %}
+  <li class="station-row" data-station-row="{{ station.station_id }}">
+    <span class="station-rank">{{ "%02d"|format(loop.index) }}</span>
+    <div class="station-details">
+      <button type="button" class="station-name" data-focus-station="{{ station.station_id }}">{{ station.name }}</button>
+      <div class="station-meta">
+        <span>{{ station.country_code or '—' }}</span>
+        {% if station.stream_url.startswith('https://') or station.stream_url.startswith('http://') %}
+        <a class="stream-link" href="{{ station.stream_url }}" target="_blank" rel="noopener noreferrer" aria-label="Open stream for {{ station.name }}">Listen ↗</a>
+        {% endif %}
+      </div>
+      <p class="station-tags" title="{{ station.genre_tags|join(', ') }}">{{ station.genre_tags|join(' · ') or 'No genre tags' }}</p>
+    </div>
+    <div class="station-score">
+      {% if kind == 'embedding' %}
+      <strong>{% if station.similarity is not none %}{{ "%.4f"|format(station.similarity) }}{% else %}—{% endif %}</strong>
+      <span>{{ "{:,.1f}".format(station.distance_km) }} km</span>
+      {% else %}<strong>{{ "{:,.1f}".format(station.distance_km) }}</strong>{% endif %}
+    </div>
+  </li>
+  {% else %}<li class="ranking-empty">No eligible neighbors.</li>{% endfor %}
+</ol>
+{% endmacro %}

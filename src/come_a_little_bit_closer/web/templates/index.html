@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Explore geographic and embedding neighborhoods of radio stations.">
+  <title>Come A Little Bit Closer</title>
+  <link rel="stylesheet" href="/static/explorer.css">
+  <script src="/static/vendor/htmx-2.0.4.min.js" defer></script>
+  <script src="/static/vendor/d3-7.9.0.min.js" defer></script>
+  <script src="/static/explorer.js" defer></script>
+</head>
+<body>
+  <header class="app-title">
+    <a href="/">Come A Little Bit Closer<span>↗</span></a>
+  </header>
+  <main id="results" aria-label="Station neighborhood visualization" aria-live="polite" aria-busy="false">
+    {% with result = initial_search %}{% include 'results.html' %}{% endwith %}
+  </main>
+  <form id="search-form" class="control-bar" action="/explore" method="get" hx-get="/explore" hx-target="#results" hx-swap="innerHTML" hx-sync="this:replace" hx-indicator="#search-progress">
+    <div class="query-field">
+      <div class="query-label-row">
+        <label for="query">query text</label>
+        <button id="genre-chip" class="genre-chip" type="button" aria-label="Clear station tag filter" hidden>
+          <span id="genre-chip-text"></span><span aria-hidden="true">×</span>
+        </button>
+      </div>
+      <input id="query" name="query" type="text" value="" maxlength="500" required placeholder="Enter query text">
+    </div>
+    <label class="model-field">
+      <span>Representation</span>
+      <select id="model" name="model" required>
+        <option value="" disabled selected>Choose a model</option>
+        {% for model in models %}
+        <option value="{{ model.model_id }}" {% if not model.available %}disabled{% endif %}>{{ model.label }}{% if not model.available %} · pending{% endif %}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <details class="advanced-controls">
+      <summary title="Origin and filters" aria-label="Origin and filters">⌖</summary>
+      <div class="advanced-panel">
+        <div class="advanced-heading">Origin & filters</div>
+        <label>Latitude<input id="latitude" name="latitude" type="number" min="-90" max="90" step="any" value="" required></label>
+        <label>Longitude<input id="longitude" name="longitude" type="number" min="-180" max="180" step="any" value="" required></label>
+        <label>Station tag<input id="genre" name="genre" type="text" value="" maxlength="100" placeholder="Detect from query"></label>
+        <label>Neighbors<input id="limit" name="limit" type="number" min="1" max="50" value="10" required></label>
+        <p>Genres are matched from query text. Use a station tag to disambiguate. Origin coordinates are appended to learned queries.</p>
+      </div>
+    </details>
+    <button class="submit-button" type="submit" aria-label="Compare neighborhoods">Explore <span aria-hidden="true">↗</span></button>
+    <span id="search-progress" class="htmx-indicator" role="status">Comparing…</span>
+    <p id="request-error" class="request-error" role="alert" hidden></p>
+  </form>
+  <section id="station-player" class="station-player" aria-label="Station player" hidden>
+    <div class="player-heading">
+      <div><strong id="player-station-name"></strong><span id="player-station-country"></span></div>
+      <button id="player-retry" type="button" aria-label="Retry station stream" title="Retry" hidden>↻</button>
+      <button id="player-close" type="button" aria-label="Close station player">×</button>
+    </div>
+    <audio id="station-audio" controls preload="none" aria-label="Selected station audio"></audio>
+    <p id="player-status" role="status" aria-live="polite"></p>
+  </section>
+</body>
+</html>

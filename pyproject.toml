@@ -1,0 +1,88 @@
+[project]
+name = "come-a-little-bit-closer"
+version = "0.1.0"
+description = "Geographic and semantic neighborhoods in embedding models"
+readme = "README.md"
+authors = [{ name = "Artem Frenk", email = "agf6353@nyu.edu" }]
+requires-python = ">=3.12"
+dependencies = [
+    "beartype>=0.23.1",
+    "duckdb>=1.5.6",
+    "fastapi>=0.143.3",
+    "jaxtyping>=0.3.11",
+    "jinja2>=3.1.6",
+    "numpy>=2.5.4",
+    "pydantic>=2.14.1",
+    "pydantic-settings>=2.16.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+come-a-little-bit-closer = "come_a_little_bit_closer.cli:main"
+
+[project.optional-dependencies]
+cpu = [
+    "sentence-transformers[image]>=6.1.0",
+    "torch",
+    "torchvision",
+]
+ampere = [
+    "sentence-transformers[image]>=6.1.0",
+    "torch; sys_platform == 'linux'",
+    "torchvision; sys_platform == 'linux'",
+]
+research = [
+    "matplotlib>=3.11.2",
+]
+
+[tool.uv]
+default-groups = ["dev", "cpu"]
+conflicts = [[{ extra = "cpu" }, { extra = "ampere" }]]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu129", extra = "ampere", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform == 'linux'" },
+    { index = "pytorch-cu129", extra = "ampere", marker = "sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu129"
+url = "https://download.pytorch.org/whl/cu129"
+explicit = true
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/come_a_little_bit_closer/geometry/schemas.py" = ["F722", "F821"]
+"src/come_a_little_bit_closer/projection/schemas.py" = ["F722", "F821"]
+"src/come_a_little_bit_closer/evaluation/location_schemas.py" = ["F722", "F821"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+cpu = ["come-a-little-bit-closer[cpu]"]
+dev = [
+    "black>=26.10.1",
+    "h3>=4.3.1",
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+]

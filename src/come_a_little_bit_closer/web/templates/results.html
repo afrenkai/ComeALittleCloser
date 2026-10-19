@@ -1,0 +1,81 @@
+{% from 'station_list.html' import station_list %}
+<div class="comparison" data-comparison>
+  <script type="application/json" data-map-data>{{ result|tojson }}</script>
+  <div class="map-stage" data-map-stage>
+    <canvas class="world-map" role="img" aria-label="Interactive orthographic globe. Drag to rotate. Click the visible hemisphere to set the origin. Use plus and minus to zoom." tabindex="0" data-world-map></canvas>
+    <div class="map-tooltip" data-map-tooltip role="status" hidden></div>
+    <div class="map-loading" data-map-loading>Loading coastlines…</div>
+    <div class="projection-empty" data-projection-empty hidden>
+      <strong>Embedding projection unavailable</strong>
+      <span>A model needs computed embeddings before its representation can be plotted.</span>
+    </div>
+  </div>
+  <div class="view-toggle" role="group" aria-label="Visualization view">
+    <button type="button" data-view="globe" aria-pressed="true">Globe</button>
+    <button type="button" data-view="embedding" aria-pressed="false" {% if not result %}disabled{% endif %}>Embedding</button>
+  </div>
+  <div class="map-controls" aria-label="Visualization controls">
+    <button type="button" data-map-zoom="in" aria-label="Zoom in">+</button>
+    <button type="button" data-map-zoom="out" aria-label="Zoom out">−</button>
+    <button type="button" data-map-reset aria-label="Reset view">↺</button>
+    <details class="view-info">
+      <summary aria-label="View information" title="View information">i</summary>
+      <div class="info-popover">
+        <h2 data-view-label>Geographic space</h2>
+        <p data-view-help>Orthographic projection · Natural Earth.</p>
+        <p class="projection-note" data-projection-note hidden></p>
+        {% if result and not result.is_learned %}
+        <p>Coordinate control: unit-coordinate cosine agrees with Haversine up to ties and numerical precision.</p>
+        {% endif %}
+        <p>Genre match uses catalog tags, not audio-verified labels. Spatial rankings use the same eligible stations. Extra distance compares their mean distances. Genre match evaluates the model's unfiltered top results.</p>
+        <div class="map-legend" aria-label="Point legend">
+          <span><i class="origin-mark"></i>Origin / query</span>
+          <span><i class="geographic-mark"></i>Geographic</span>
+          <span><i class="embedding-mark"></i>Embedding</span>
+          <span><i class="shared-mark"></i>Shared</span>
+        </div>
+        <div class="cluster-legend" data-cluster-legend hidden></div>
+      </div>
+    </details>
+  </div>
+  {% if result %}
+  <details class="results-drawer" data-results-drawer>
+    <summary>
+      <span class="drawer-dot"></span>
+      <span>{{ result.genre or 'All stations' }}</span>
+      <span class="drawer-overlap">{% if result.geographic_neighbors and result.embedding_neighbors %}{{ "%.0f"|format(result.overlap_at_k * 100) }}% spatial overlap{% else %}No comparison{% endif %}</span>
+      <span class="drawer-chevron">⌃</span>
+    </summary>
+    <div class="drawer-content">
+      <div class="drawer-model"><h2>{{ result.model_label }}</h2></div>
+      <p class="candidate-scope" role="status">
+        {% if result.genre_selection.source == 'query' %}From query: {{ result.genre }}{% elif result.genre_selection.source == 'filter' %}Station tag: {{ result.genre }}{% else %}All stations · no genre detected{% endif %}
+      </p>
+      {% if result.message %}<p class="method-note">{{ result.message }}</p>{% endif %}
+      <dl class="retrieval-metrics">
+        {% if result.is_learned and result.metrics.unfiltered_genre_precision_at_k is not none %}
+        <div><dt>Unfiltered genre match</dt><dd>{{ "%.0f"|format(result.metrics.unfiltered_genre_precision_at_k * 100) }}%</dd></div>
+        {% endif %}
+        {% if result.metrics.excess_distance_km is not none %}
+        <div><dt>Extra distance</dt><dd>{{ "{:,.0f}".format(result.metrics.excess_distance_km) }} km</dd></div>
+        {% endif %}
+      </dl>
+      <div class="rankings">
+        {% for neighbors, label, kind, mean_distance in [(result.geographic_neighbors, 'Geographic', 'geographic', result.metrics.geographic_mean_distance_km), (result.embedding_neighbors, 'Embedding', 'embedding', result.metrics.embedding_mean_distance_km)] %}
+        <section class="ranking-panel ranking-{{ kind }}">
+          <h3>{{ label }} <span>{% if kind == 'geographic' %}KM{% else %}COSINE / KM{% endif %}</span></h3>
+          {% if mean_distance is not none %}<p class="ranking-distance">Mean {{ "{:,.0f}".format(mean_distance) }} km</p>{% endif %}
+          {{ station_list(neighbors, kind) }}
+        </section>
+        {% endfor %}
+      </div>
+      {% if result.is_learned and result.genre and result.unfiltered_embedding_neighbors %}
+      <details class="raw-retrieval">
+        <summary>Before genre filtering</summary>
+        {{ station_list(result.unfiltered_embedding_neighbors, 'embedding') }}
+      </details>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+</div>

@@ -1,0 +1,39 @@
+name: Checks
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        with:
+          enable-cache: true
+          version: "0.13.0"
+      - run: uv sync --locked
+      - run: uv run --locked ruff check src tests
+      - run: uv run --locked black --check src tests
+      - run: uv run --locked pytest -q --ignore=tests/test_cpu_model.py
+      - run: node --check src/come_a_little_bit_closer/web/static/explorer.js
+      - run: uv build --no-sources
+
+  cpu-embeddings:
+    runs-on: ubuntu-latest
+    env:
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      OMP_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "2"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        with:
+          enable-cache: true
+          version: "0.13.0"
+      - run: uv sync --locked --extra cpu
+      - run: uv run --locked --extra cpu pytest -q tests/test_cpu_model.py

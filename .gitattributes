@@ -1,0 +1,10 @@
+* text=auto eol=lf
+*.png binary
+*.pdf binary
+*.npz binary
+*.zip binary
+src/come_a_little_bit_closer/web/static/vendor/** linguist-vendored
+paper/tmlr.sty linguist-vendored -whitespace
+paper/tmlr.bst linguist-vendored -whitespace
+paper/math_commands.tex linguist-vendored
+experiments/genre-coverage.csv -text whitespace=cr-at-eol

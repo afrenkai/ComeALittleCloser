@@ -1,0 +1,73 @@
+\documentclass[10pt]{article}
+\input{preamble.tex}
+\title{Come A Little Bit Closer:\\Basic Mathematical Setup}
+\input{authors.tex}
+\hypersetup{pdftitle={Come A Little Bit Closer: Basic Mathematical Setup}}
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This note defines the geographic reference, semantic score, explicit spatial control, and evaluation criteria used in the project. Its central distinction is between the geometry of a supplied coordinate encoding and the geometry learned from text or audio. Definitions and the exact-arithmetic spherical ranking result are formalized in the accompanying Lean 4 project.
+\end{abstract}
+
+\section{Coordinates and semantic embeddings}
+A station has location $p_i=(\phi_i,\lambda_i)$ in radians and advertised genre set $G_i$. A query supplies origin $p_q$ and genre $g_q$. For finite candidate set $\mathcal C$, the eligible subset is
+\begin{equation}
+\mathcal C_g=\{i\in\mathcal C:g_q\in G_i\}.
+\end{equation}
+For model $m$ and nonzero representation $f_m(x)$, define
+\begin{equation}
+z_m(x)=\frac{f_m(x)}{\lVert f_m(x)\rVert_2},\qquad
+s_m(q,i)=\langle z_m(x_q),z_m(x_i)\rangle,\qquad d_m(q,i)=1-s_m(q,i).
+\end{equation}
+Descending semantic score and ascending geographic distance are separate rankings over the same eligible candidates. Ties use the station identifier. In the combined task, methods rank the full corpus and genre errors are reported separately. Missing locations and zero or nonfinite embeddings are failures or exclusions with explicit counts.
+
+\section{Haversine distance and a spherical cosine control}
+Set $R=6371.0088$ km and write coordinate differences as $\Delta\phi$ and $\Delta\lambda$. Define
+\begin{align}
+A(q,i)&=\sin^2(\Delta\phi/2)+\cos\phi_q\cos\phi_i\sin^2(\Delta\lambda/2),\\
+d_H(q,i)&=2R\arcsin\sqrt{A(q,i)},\\
+u(p)&=[\cos\phi\cos\lambda,\ \cos\phi\sin\lambda,\ \sin\phi]^{\mathsf T}.
+\end{align}
+The coordinate encoding has unit norm and satisfies
+\begin{equation}
+d_H(q,i)=R\arccos\langle u(p_q),u(p_i)\rangle.
+\end{equation}
+Because the inverse cosine reverses ordering on its valid domain, positive-radius geographic ranking agrees with descending spherical cosine in exact arithmetic:
+\begin{equation}
+d_H(q,i)\leq d_H(q,j)\ \Longleftrightarrow\
+\langle u(p_q),u(p_i)\rangle\geq\langle u(p_q),u(p_j)\rangle.
+\end{equation}
+This result concerns the explicit coordinate encoding. It does not assert a property of embeddings of numeric strings, place names, station descriptions, or audio. The reference uses spherical distance; numerical implementation and near-tie behavior are tested independently.
+
+\section{Explicit semantic--spatial fusion}
+For unit semantic vectors and spatial weight $\alpha\in[0,1]$, define
+\begin{align}
+v_\alpha(z,p)&=[\sqrt{1-\alpha}\,z;\sqrt\alpha\,u(p)],\\
+s_\alpha(q,i)&=(1-\alpha)\langle z_q,z_i\rangle+
+\alpha\langle u(p_q),u(p_i)\rangle.
+\end{align}
+The fused vector has unit norm, and its inner product is $s_\alpha$. The endpoints recover semantic-only and coordinate-only scoring. Select $\alpha$ on development queries; compare it with an encoder receiving the same coordinates as text. A second baseline selects a semantic candidate pool and reranks it by $d_H$.
+
+H3 provides a discrete candidate pool using cells within a fixed ring budget. Grid hops are evaluated as an index approximation, with reference-neighbor recall, empty pools, and traversal failures reported. The formal model abstracts this partial API; it does not prove properties of the H3 implementation.
+
+\section{Evaluation and representation probes}
+Let $N_k^H$ and $N_k^m$ be top-$k$ sets under the reference and model rankings. With sufficient candidates,
+\begin{align}
+O_k&=|N_k^H\cap N_k^m|/k,\\
+P_k&=|\{i\in N_k^m:g_q\in G_i\}|/k,\\
+\Delta_H&=d_H(q,i_m)-\min_{i\in\mathcal C_g}d_H(q,i).
+\end{align}
+The excess distance is reported only for an eligible first result $i_m$, together with ineligible-result rates and distance-threshold success on all queries. Spearman correlation measures complete eligible-candidate rank agreement. H3 candidate recall replaces $N_k^m$ in the overlap numerator with the complete H3 candidate pool. Queries with too few eligible candidates are reported in coverage counts.
+
+For hidden states $h_j^{(\ell)}$, a ridge probe fits spherical-coordinate targets:
+\begin{equation}
+\widehat B_\ell\in\operatorname*{arg\,min}_B
+\frac1n\sum_j\lVert B^{\mathsf T}h_j^{(\ell)}-u(p_j)\rVert_2^2+
+\eta\lVert B\rVert_F^2.
+\end{equation}
+Training, development, and test locations occupy separate spatial blocks. Predictions are normalized for angular evaluation. Probe accuracy tests accessible geographic information, while retrieval metrics test the final neighborhood geometry. Neither probe success nor geographic correlation alone establishes causal use of a geographic mechanism.
+
+\paragraph{Formal correspondence.}
+\texttt{ComeCloser.Geometry} defines coordinates, cosine, Haversine distance, and the spherical encoding, and proves their ranking correspondence. \texttt{ComeCloser.Objectives} defines eligibility, deterministic ranking, overlap, precision, excess distance, Spearman correlation, fusion, ridge fitting, and the optional adaptation losses. Real-arithmetic proofs do not certify floating-point code, learned-model behavior, data labels, or the statistical conclusions of the proposed experiment.
+\end{document}

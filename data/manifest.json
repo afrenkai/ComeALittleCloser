@@ -1,0 +1,29 @@
+{
+  "acquisition_date": "2026-10-17",
+  "status": "Availability verification before deduplication, annotation, or model evaluation",
+  "sources": [
+    {
+      "name": "Radio Browser geolocated stations marked working",
+      "url": "https://de1.api.radio-browser.info/json/stations/search?has_geo_info=true&hidebroken=true&limit=100000&order=name",
+      "documentation": "https://docs.radio-browser.info/",
+      "filename": "radio-browser-geolocated.json",
+      "sha256": "0a7dd5c2090dd20e1d99087b8e451fcebb178bafb04a357c4e2da71eb5db1c48",
+      "raw_records": 13498,
+      "records_with_numeric_coordinates_in_valid_ranges": 13496,
+      "records_with_exact_rock_tag": 977,
+      "distinct_resolved_stream_urls_before_validation": 11482,
+      "nonempty_country_codes": 188,
+      "notes": "A successful stream check is a directory field, not an independent stream test. Coordinate validity checks do not establish factual location accuracy. The live API may change after acquisition."
+    },
+    {
+      "name": "GeoNames cities15000 extract",
+      "url": "https://download.geonames.org/export/dump/cities15000.zip",
+      "documentation": "https://download.geonames.org/export/dump/readme.txt",
+      "filename": "cities15000.zip",
+      "sha256": "3068649d544bacddb18f7d80ebceb20a6970c0948c9a3553c830047f72ae6618",
+      "archive_member": "cities15000.txt",
+      "raw_records": 34166,
+      "notes": "The archive is updated regularly; future downloads may differ."
+    }
+  ]
+}
