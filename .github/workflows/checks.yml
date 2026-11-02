@@ -17,7 +17,7 @@ jobs:
       - run: uv sync --locked
       - run: uv run --locked ruff check src tests
       - run: uv run --locked black --check src tests
-      - run: uv run --locked pytest -q --ignore=tests/test_cpu_model.py
+      - run: uv run --locked pytest -q --ignore=tests/test_cpu_model.py --ignore=tests/test_hidden_states.py
       - run: node --check src/come_a_little_bit_closer/web/static/explorer.js
       - run: uv build --no-sources
 
@@ -36,4 +36,4 @@ jobs:
           enable-cache: true
           version: "0.13.0"
       - run: uv sync --locked --extra cpu
-      - run: uv run --locked --extra cpu pytest -q tests/test_cpu_model.py
+      - run: uv run --locked --extra cpu pytest -q tests/test_cpu_model.py tests/test_hidden_states.py
