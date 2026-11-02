@@ -83,6 +83,19 @@ class LayerExtractor:
             )
         self.model.to(device).eval()
 
+    def count_truncated(self, texts: list[str]) -> int:
+        if self.spec.architecture == "encoder":
+            lengths = [
+                len(ids)
+                for ids in self.tokenizer(texts, add_special_tokens=True)["input_ids"]
+            ]
+            return sum(length > self.max_length for length in lengths)
+        lengths = [
+            len(ids)
+            for ids in self.tokenizer(texts, add_special_tokens=False)["input_ids"]
+        ]
+        return sum(length > self.max_length - 1 for length in lengths)
+
     def encode(self, texts: list[str]) -> EncodedBatch:
         if self.spec.architecture == "encoder":
             encoded = self.tokenizer(

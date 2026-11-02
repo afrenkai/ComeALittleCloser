@@ -1,0 +1,177 @@
+import argparse
+import hashlib
+import os
+import tempfile
+from datetime import UTC, datetime
+from pathlib import Path
+
+import numpy as np
+import transformers
+
+from come_a_little_bit_closer.data.cities import load_places, place_text
+from come_a_little_bit_closer.evaluation.layer_schemas import (
+    FeatureManifest,
+    LayerDataset,
+    LayerPlan,
+    Pooling,
+    TextCondition,
+)
+from come_a_little_bit_closer.evaluation.location_prepare import metadata_document
+from come_a_little_bit_closer.geometry.schemas import Coordinates
+from come_a_little_bit_closer.models.hidden_states import LayerExtractor
+from come_a_little_bit_closer.models.layer_catalog import find_layer_model
+from come_a_little_bit_closer.storage.catalog import StationCatalog, initialize_catalog
+from come_a_little_bit_closer.storage.schemas import DatabaseSettings
+
+
+def feature_path(
+    plan: LayerPlan,
+    model_id: str,
+    dataset: LayerDataset,
+    condition: TextCondition,
+    pooling: Pooling,
+) -> Path:
+    return plan.feature_directory / model_id / f"{dataset}-{condition}-{pooling}.npy"
+
+
+def dataset_items(
+    dataset: LayerDataset, condition: TextCondition
+) -> tuple[list[str], list[str], list[Coordinates], list[str], str]:
+    if dataset == "cities":
+        if condition == "metadata":
+            raise ValueError("Cities support the name and name-country conditions.")
+        archive_path = Path("data/raw/cities15000.zip")
+        places = load_places(archive_path, Path("data/raw/countryInfo.txt"))
+        return (
+            [place.place_id for place in places],
+            [place_text(place, condition) for place in places],
+            [place.coordinates for place in places],
+            [place.country_code for place in places],
+            hashlib.sha256(archive_path.read_bytes()).hexdigest(),
+        )
+    if condition != "metadata":
+        raise ValueError("Stations support only the metadata condition.")
+    source = DatabaseSettings()
+    stats = initialize_catalog(source)
+    stations = StationCatalog(source.database_path).stations()
+    return (
+        [station.station_id for station in stations],
+        [metadata_document(station) for station in stations],
+        [station.coordinates for station in stations],
+        [station.country_code for station in stations],
+        stats.source_sha256,
+    )
+
+
+def existing_features_match(manifest_path: Path, expected: FeatureManifest) -> bool:
+    if not manifest_path.exists():
+        return False
+    existing = FeatureManifest.model_validate_json(manifest_path.read_bytes())
+    ignored = {"created_at"}
+    if existing.model_dump(exclude=ignored) != expected.model_dump(exclude=ignored):
+        raise ValueError("Existing feature file does not match this run.")
+    return True
+
+
+def write_features(
+    plan: LayerPlan,
+    extractor: LayerExtractor,
+    dataset: LayerDataset,
+    condition: TextCondition,
+    item_ids: list[str],
+    texts: list[str],
+    source_sha256: str,
+) -> list[Path]:
+    spec = extractor.spec
+    poolings: list[Pooling] = (
+        ["mean", "last"] if spec.architecture == "decoder" else ["mean"]
+    )
+    truncated_items = extractor.count_truncated(texts)
+    manifests = {
+        pooling: FeatureManifest(
+            model_id=spec.model_id,
+            model_spec=spec,
+            checkpoint=spec.checkpoint,
+            revision=spec.revision,
+            random_init=spec.random_init,
+            dataset=dataset,
+            condition=condition,
+            pooling=pooling,
+            source_sha256=source_sha256,
+            item_ids=item_ids,
+            layers=extractor.model.config.num_hidden_layers + 1,
+            hidden=extractor.model.config.hidden_size,
+            dtype="float16",
+            max_length=extractor.max_length,
+            truncated_items=truncated_items,
+            transformers_version=transformers.__version__,
+            created_at=datetime.now(UTC).isoformat(),
+        )
+        for pooling in poolings
+    }
+    paths = {
+        pooling: feature_path(plan, spec.model_id, dataset, condition, pooling)
+        for pooling in poolings
+    }
+    pending = [
+        pooling
+        for pooling in poolings
+        if not existing_features_match(
+            paths[pooling].with_suffix(".json"), manifests[pooling]
+        )
+    ]
+    if pending:
+        features = extractor.extract(texts, plan.batch_size)
+        for pooling in pending:
+            paths[pooling].parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                dir=paths[pooling].parent, suffix=".npy", delete=False
+            ) as temporary_file:
+                temporary_path = Path(temporary_file.name)
+                np.save(temporary_file, features[pooling])
+            os.replace(temporary_path, paths[pooling])
+            manifest_path = paths[pooling].with_suffix(".json")
+            with tempfile.NamedTemporaryFile(
+                "w", dir=manifest_path.parent, suffix=".json", delete=False
+            ) as temporary_file:
+                temporary_manifest = Path(temporary_file.name)
+                temporary_file.write(
+                    manifests[pooling].model_dump_json(indent=2) + "\n"
+                )
+            os.replace(temporary_manifest, manifest_path)
+    return [paths[pooling] for pooling in poolings]
+
+
+def extract_model(plan: LayerPlan, model_id: str, device: str) -> list[Path]:
+    if model_id not in plan.model_ids:
+        raise ValueError("Model is outside the frozen analysis plan.")
+    extractor = LayerExtractor(find_layer_model(model_id), device, plan.max_length)
+    written: list[Path] = []
+    for dataset, conditions in plan.datasets.items():
+        for condition in conditions:
+            item_ids, texts, coordinates, country_codes, source_sha256 = dataset_items(
+                dataset, condition
+            )
+            written.extend(
+                write_features(
+                    plan, extractor, dataset, condition, item_ids, texts, source_sha256
+                )
+            )
+            print(f"Extracted {model_id} {dataset} {condition}", flush=True)
+    return written
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Extract per-layer pooled features.")
+    parser.add_argument(
+        "--config", type=Path, default=Path("experiments/layers-v1.json")
+    )
+    parser.add_argument("--model", required=True)
+    parser.add_argument("--ampere", action="store_true")
+    arguments = parser.parse_args()
+    plan = LayerPlan.model_validate_json(arguments.config.read_bytes())
+    extract_model(plan, arguments.model, "cuda" if arguments.ampere else "cpu")
+
+
+if __name__ == "__main__":
+    main()
