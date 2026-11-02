@@ -26,7 +26,7 @@ class LayerPlan(ProbeSettings):
     model_ids: list[str]
     datasets: dict[LayerDataset, list[TextCondition]]
     split_kinds: list[SplitKind]
-    max_length: int = Field(default=64, gt=1)
+    max_length: int = Field(default=256, gt=1)
     batch_size: int = Field(default=256, gt=0)
     feature_directory: Path
     output_directory: Path

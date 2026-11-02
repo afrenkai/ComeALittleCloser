@@ -94,3 +94,20 @@ def test_extract_rejects_mismatched_existing_features(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="does not match this run"):
         write_features(plan, extractor, "cities", "name", ["b"], ["rock"], "sha")
     assert json.loads(manifest_path.read_text())["item_ids"] == ["a"]
+
+
+def test_incomplete_array_is_rewritten_and_files_are_group_readable(
+    tmp_path: Path,
+) -> None:
+    save_tiny_bert(tmp_path / "model")
+    plan = tiny_plan(tmp_path, max_length=8)
+    extractor = LayerExtractor(
+        tiny_spec(tmp_path / "model"), device="cpu", max_length=plan.max_length
+    )
+    paths = write_features(plan, extractor, "cities", "name", ["a"], ["rock"], "sha")
+    assert paths[0].stat().st_mode & 0o777 == 0o640
+    assert paths[0].with_suffix(".json").stat().st_mode & 0o777 == 0o640
+    paths[0].unlink()
+    write_features(plan, extractor, "cities", "name", ["a"], ["rock"], "sha")
+    assert np.load(paths[0], mmap_mode="r").shape == (3, 1, 16)
+    assert list(paths[0].parent.glob("tmp*")) == []

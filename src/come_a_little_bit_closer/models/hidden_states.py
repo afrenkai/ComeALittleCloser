@@ -136,12 +136,11 @@ class LayerExtractor:
         if not texts:
             raise ValueError("extract needs at least one text.")
         order = sorted(range(len(texts)), key=lambda index: len(texts[index]))
-        pooled: dict[str, list[np.ndarray]] = {"mean": []}
-        if self.spec.architecture == "decoder":
-            pooled["last"] = []
+        decoder = self.spec.architecture == "decoder"
+        features: dict[str, np.ndarray] = {}
         for start in range(0, len(order), batch_size):
-            batch_texts = [texts[index] for index in order[start : start + batch_size]]
-            encoded = self.encode(batch_texts)
+            positions = order[start : start + batch_size]
+            encoded = self.encode([texts[index] for index in positions])
             attention_mask = encoded.attention_mask.to(self.device)
             content_mask = encoded.content_mask.to(self.device)
             with torch.no_grad():
@@ -151,24 +150,20 @@ class LayerExtractor:
                     output_hidden_states=True,
                 )
             layer_states = [state.float() for state in outputs.hidden_states]
-            pooled["mean"].append(
-                torch.stack([mean_pool(state, content_mask) for state in layer_states])
-                .cpu()
-                .numpy()
-            )
-            if self.spec.architecture == "decoder":
-                pooled["last"].append(
-                    torch.stack(
-                        [
-                            last_token_pool(state, attention_mask)
-                            for state in layer_states
-                        ]
-                    )
-                    .cpu()
-                    .numpy()
+            batch_pooled = {
+                "mean": torch.stack(
+                    [mean_pool(state, content_mask) for state in layer_states]
                 )
-        restore = np.argsort(np.asarray(order))
-        return {
-            pooling: checked_float16(np.concatenate(batches, axis=1)[:, restore])
-            for pooling, batches in pooled.items()
-        }
+            }
+            if decoder:
+                batch_pooled["last"] = torch.stack(
+                    [last_token_pool(state, attention_mask) for state in layer_states]
+                )
+            for pooling, values in batch_pooled.items():
+                if pooling not in features:
+                    features[pooling] = np.empty(
+                        (values.shape[0], len(texts), values.shape[2]),
+                        dtype=np.float16,
+                    )
+                features[pooling][:, positions] = checked_float16(values.cpu().numpy())
+        return features

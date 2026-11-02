@@ -2,8 +2,10 @@ import argparse
 import hashlib
 import os
 import tempfile
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import BinaryIO
 
 import numpy as np
 import transformers
@@ -41,13 +43,19 @@ def dataset_items(
         if condition == "metadata":
             raise ValueError("Cities support the name and name-country conditions.")
         archive_path = Path("data/raw/cities15000.zip")
-        places = load_places(archive_path, Path("data/raw/countryInfo.txt"))
+        country_info_path = Path("data/raw/countryInfo.txt")
+        places = load_places(archive_path, country_info_path)
         return (
             [place.place_id for place in places],
             [place_text(place, condition) for place in places],
             [place.coordinates for place in places],
             [place.country_code for place in places],
-            hashlib.sha256(archive_path.read_bytes()).hexdigest(),
+            hashlib.sha256(
+                (
+                    hashlib.sha256(archive_path.read_bytes()).hexdigest()
+                    + hashlib.sha256(country_info_path.read_bytes()).hexdigest()
+                ).encode()
+            ).hexdigest(),
         )
     if condition != "metadata":
         raise ValueError("Stations support only the metadata condition.")
@@ -71,6 +79,29 @@ def existing_features_match(manifest_path: Path, expected: FeatureManifest) -> b
     if existing.model_dump(exclude=ignored) != expected.model_dump(exclude=ignored):
         raise ValueError("Existing feature file does not match this run.")
     return True
+
+
+def features_complete(path: Path, expected: FeatureManifest) -> bool:
+    if not existing_features_match(path.with_suffix(".json"), expected):
+        return False
+    return path.exists() and np.load(path, mmap_mode="r").shape == (
+        expected.layers,
+        len(expected.item_ids),
+        expected.hidden,
+    )
+
+
+def atomic_write(path: Path, write: Callable[[BinaryIO], object]) -> None:
+    with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as handle:
+        temporary_path = Path(handle.name)
+        try:
+            write(handle)
+            handle.flush()
+            os.fchmod(handle.fileno(), 0o640)
+        except BaseException:
+            temporary_path.unlink(missing_ok=True)
+            raise
+    os.replace(temporary_path, path)
 
 
 def write_features(
@@ -116,29 +147,21 @@ def write_features(
     pending = [
         pooling
         for pooling in poolings
-        if not existing_features_match(
-            paths[pooling].with_suffix(".json"), manifests[pooling]
-        )
+        if not features_complete(paths[pooling], manifests[pooling])
     ]
     if pending:
         features = extractor.extract(texts, plan.batch_size)
         for pooling in pending:
             paths[pooling].parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.NamedTemporaryFile(
-                dir=paths[pooling].parent, suffix=".npy", delete=False
-            ) as temporary_file:
-                temporary_path = Path(temporary_file.name)
-                np.save(temporary_file, features[pooling])
-            os.replace(temporary_path, paths[pooling])
-            manifest_path = paths[pooling].with_suffix(".json")
-            with tempfile.NamedTemporaryFile(
-                "w", dir=manifest_path.parent, suffix=".json", delete=False
-            ) as temporary_file:
-                temporary_manifest = Path(temporary_file.name)
-                temporary_file.write(
-                    manifests[pooling].model_dump_json(indent=2) + "\n"
-                )
-            os.replace(temporary_manifest, manifest_path)
+            atomic_write(
+                paths[pooling], lambda handle: np.save(handle, features[pooling])
+            )
+            atomic_write(
+                paths[pooling].with_suffix(".json"),
+                lambda handle: handle.write(
+                    (manifests[pooling].model_dump_json(indent=2) + "\n").encode()
+                ),
+            )
     return [paths[pooling] for pooling in poolings]
 
 
@@ -149,12 +172,16 @@ def extract_model(plan: LayerPlan, model_id: str, device: str) -> list[Path]:
     written: list[Path] = []
     for dataset, conditions in plan.datasets.items():
         for condition in conditions:
-            item_ids, texts, coordinates, country_codes, source_sha256 = dataset_items(
-                dataset, condition
-            )
+            items = dataset_items(dataset, condition)
             written.extend(
                 write_features(
-                    plan, extractor, dataset, condition, item_ids, texts, source_sha256
+                    plan,
+                    extractor,
+                    dataset,
+                    condition,
+                    items[0],
+                    items[1],
+                    items[4],
                 )
             )
             print(f"Extracted {model_id} {dataset} {condition}", flush=True)
