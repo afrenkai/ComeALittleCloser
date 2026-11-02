@@ -13,3 +13,16 @@ ssh -o ClearAllForwardings=yes -o ControlMaster=no -o ControlPath=none turing
 ```
 
 Research web services and forwarding tunnels remain disabled. web.sbatch refuses execution. Leave the existing desktop-managed Codex SSH control connection enabled. The local explorer does not depend on a remote web service.
+
+## Boston College Andromeda
+
+Work from the checkout under `/projects/weilab/$USER`. `/home` is a small filesystem shared by every user, so `ops/bc.env` keeps the uv cache, uv-managed Python, Hugging Face hub, and Torch cache under `/projects/weilab/$USER/.cache`. It also sets the Slurm account and emails `$USER@bc.edu` when a job begins, ends, or fails. Install uv once with `curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh`.
+
+```bash
+source ops/bc.env
+sbatch ops/check.sbatch
+bc_sbatch_gpu ops/embed.sbatch
+bc_sbatch_gtml ops/embed.sbatch
+```
+
+The cu129 Torch wheels support sm_75 and newer, so `bc_sbatch_gpu` restricts GPU jobs to A100, L40S, and H200 nodes and skips the V100 nodes. When `short` is backed up, `bc_sbatch_gtml` submits to the gtml L40S node instead. The site profile sets `SBATCH_EXPORT=none`, so `bc.env` names the cache variables jobs receive; add any new variable a job needs to that list. Download pinned checkpoints on the login node with `hf download <checkpoint> --revision <revision>` before running the offline jobs.
