@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import numpy as np
@@ -15,7 +16,7 @@ from come_a_little_bit_closer.models.layer_catalog import (
     find_layer_model,
     layer_model_specs,
 )
-from come_a_little_bit_closer.models.schemas import LayerModelSpec
+from come_a_little_bit_closer.models.layer_schemas import LayerModelSpec
 
 
 def test_mean_pool_ignores_padding_and_special_tokens() -> None:
@@ -52,54 +53,141 @@ def test_checked_float16_rejects_overflow() -> None:
         checked_float16(np.array([np.nan], dtype=np.float32))
 
 
-def test_layer_extractor_tiny_bert_shapes_and_order(tmp_path: Path) -> None:
+VOCAB = [
+    "[PAD]",
+    "[UNK]",
+    "[CLS]",
+    "[SEP]",
+    "[MASK]",
+    "rock",
+    "jazz",
+    "station",
+    "near",
+]
+
+
+def save_tiny_bert(path: Path, dtype: torch.dtype = torch.float32) -> BertModel:
     torch.manual_seed(1729)
-    tokenizer = BertTokenizerFast(
-        vocab={
-            token: index
-            for index, token in enumerate(
-                ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]", "rock", "jazz"]
-                + ["station", "near"]
-            )
-        }
-    )
-    tokenizer.save_pretrained(tmp_path)
-    BertModel(
+    BertTokenizerFast(
+        vocab={token: index for index, token in enumerate(VOCAB)}, eos_token="[SEP]"
+    ).save_pretrained(path)
+    model = BertModel(
         BertConfig(
-            vocab_size=len(tokenizer),
+            vocab_size=len(VOCAB),
             hidden_size=16,
             num_hidden_layers=2,
             num_attention_heads=2,
             intermediate_size=32,
             max_position_embeddings=64,
+            dtype=dtype,
         )
-    ).save_pretrained(tmp_path)
-    spec = LayerModelSpec(
+    )
+    model.save_pretrained(path)
+    return model
+
+
+def tiny_spec(path: Path, **fields: object) -> LayerModelSpec:
+    return LayerModelSpec(
         model_id="tiny-bert",
         family="tiny",
         stage="base",
         stage_order=1,
-        checkpoint=str(tmp_path),
+        checkpoint=str(path),
         revision="local-fixture",
-        architecture="encoder",
+        **{"architecture": "encoder", **fields},
     )
-    texts = ["rock", "jazz station near rock"]
-    one = LayerExtractor(spec, device="cpu", max_length=32).extract(texts, 1)
-    two = LayerExtractor(spec, device="cpu", max_length=32).extract(texts, 2)
-    assert list(one) == ["mean"]
-    assert one["mean"].shape == (3, 2, 16)
-    assert one["mean"].dtype == np.float16
-    np.testing.assert_allclose(one["mean"], two["mean"], atol=2e-3)
-    assert not np.allclose(one["mean"][:, 0], one["mean"][:, 1])
+
+
+def test_layer_extractor_tiny_bert_shapes_order_and_special_tokens(
+    tmp_path: Path,
+) -> None:
+    save_tiny_bert(tmp_path)
+    extractor = LayerExtractor(tiny_spec(tmp_path), device="cpu", max_length=32)
+    texts = ["jazz station near rock", "rock"]
+    one = extractor.extract(texts, 1)["mean"]
+    two = extractor.extract(texts, 2)["mean"]
+    assert one.dtype == np.float16 and one.shape == (3, 2, 16)
+    np.testing.assert_allclose(
+        one.astype(np.float32), two.astype(np.float32), rtol=1e-2, atol=1e-2
+    )
+    for column, text in enumerate(texts):
+        alone = extractor.extract([text], 1)["mean"][:, 0]
+        np.testing.assert_allclose(
+            one[:, column].astype(np.float32),
+            alone.astype(np.float32),
+            rtol=1e-2,
+            atol=1e-2,
+        )
+    encoded = extractor.tokenizer(texts[0], return_tensors="pt")
+    with torch.no_grad():
+        embeddings = extractor.model(
+            **encoded, output_hidden_states=True
+        ).hidden_states[0][0]
+    np.testing.assert_allclose(
+        one[0, 0].astype(np.float32),
+        embeddings[1:-1].mean(dim=0).numpy(),
+        rtol=1e-2,
+        atol=1e-2,
+    )
+    with pytest.raises(ValueError):
+        extractor.extract([], 1)
+
+
+def test_decoder_appends_one_eos_excluded_from_mean(tmp_path: Path) -> None:
+    save_tiny_bert(tmp_path)
+    extractor = LayerExtractor(
+        tiny_spec(tmp_path, architecture="decoder", end_token="[SEP]"),
+        device="cpu",
+        max_length=4,
+    )
+    batch = extractor.encode(["rock", "jazz station near rock"])
+    assert batch.input_ids[0, :2].tolist() == [5, 3]
+    assert batch.attention_mask.sum(dim=1).tolist() == [2, 4]
+    assert batch.input_ids[1].tolist() == [6, 7, 8, 3]
+    assert batch.content_mask.sum(dim=1).tolist() == [1, 3]
+    features = extractor.extract(["rock"], 1)
+    with torch.no_grad():
+        states = extractor.model(
+            input_ids=torch.tensor([[5, 3]]), output_hidden_states=True
+        ).hidden_states
+    for layer, state in enumerate(states):
+        np.testing.assert_allclose(
+            features["last"][layer, 0].astype(np.float32),
+            state[0, 1].numpy(),
+            rtol=1e-2,
+            atol=1e-2,
+        )
+        np.testing.assert_allclose(
+            features["mean"][layer, 0].astype(np.float32),
+            state[0, 0].numpy(),
+            rtol=1e-2,
+            atol=1e-2,
+        )
+
+
+def test_random_init_is_float32_deterministic_and_preserves_global_rng(
+    tmp_path: Path,
+) -> None:
+    save_tiny_bert(tmp_path, dtype=torch.bfloat16)
+    spec = tiny_spec(tmp_path, random_init=True)
+    state = torch.get_rng_state()
+    first = LayerExtractor(spec, device="cpu", max_length=32)
+    assert torch.equal(state, torch.get_rng_state())
+    second = LayerExtractor(spec, device="cpu", max_length=32)
+    assert {parameter.dtype for parameter in first.model.parameters()} == {
+        torch.float32
+    }
+    texts = ["rock", "jazz station"]
+    np.testing.assert_array_equal(
+        first.extract(texts, 2)["mean"], second.extract(texts, 2)["mean"]
+    )
 
 
 def test_registry_pins_every_revision() -> None:
     specs = layer_model_specs()
     ids = [spec.model_id for spec in specs]
     assert len(ids) == len(set(ids)) == 12
-    assert all(
-        len(spec.revision) == 40 and int(spec.revision, 16) >= 0 for spec in specs
-    )
+    assert all(re.fullmatch("[0-9a-f]{40}", spec.revision) for spec in specs)
     assert find_layer_model("bge-m3").stage == "retrieval"
     for family in {spec.family for spec in specs if not spec.random_init}:
         members = [

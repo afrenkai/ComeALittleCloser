@@ -2,17 +2,16 @@ import numpy as np
 import torch
 from beartype import beartype
 from jaxtyping import Float16, Float32, jaxtyped
+from pydantic import BaseModel, ConfigDict
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 
-from come_a_little_bit_closer.models.schemas import (
+from come_a_little_bit_closer.models.layer_schemas import (
     HiddenStates,
     LayerFeatures,
     LayerModelSpec,
     PooledStates,
     TokenMask,
 )
-
-RANDOM_INIT_SEED = 1729
 
 
 @jaxtyped(typechecker=beartype)
@@ -44,6 +43,14 @@ def checked_float16(values: Float32[np.ndarray, "..."]) -> Float16[np.ndarray, "
     return values.astype(np.float16)
 
 
+class EncodedBatch(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    input_ids: torch.Tensor
+    attention_mask: torch.Tensor
+    content_mask: torch.Tensor
+
+
 class LayerExtractor:
     def __init__(self, spec: LayerModelSpec, device: str, max_length: int) -> None:
         self.spec = spec
@@ -52,46 +59,81 @@ class LayerExtractor:
         self.tokenizer = AutoTokenizer.from_pretrained(
             spec.checkpoint, revision=spec.revision, trust_remote_code=False
         )
+        self.end_token_id = self.tokenizer.convert_tokens_to_ids(
+            spec.end_token or self.tokenizer.eos_token
+        )
+        self.tokenizer.padding_side = "right"
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         if spec.random_init:
-            torch.manual_seed(RANDOM_INIT_SEED)
             config = AutoConfig.from_pretrained(
                 spec.checkpoint, revision=spec.revision, trust_remote_code=False
             )
-            self.model = AutoModel.from_config(config, trust_remote_code=False)
+            with torch.random.fork_rng(devices=[]):
+                torch.manual_seed(spec.random_seed)
+                self.model = AutoModel.from_config(
+                    config, dtype=torch.float32, trust_remote_code=False
+                )
         else:
             self.model = AutoModel.from_pretrained(
                 spec.checkpoint,
                 revision=spec.revision,
-                torch_dtype=torch.float32,
+                dtype=torch.float32,
                 trust_remote_code=False,
             )
         self.model.to(device).eval()
 
-    @jaxtyped(typechecker=beartype)
-    def extract(self, texts: list[str], batch_size: int) -> dict[str, LayerFeatures]:
-        order = sorted(range(len(texts)), key=lambda index: len(texts[index]))
-        pooled: dict[str, list[np.ndarray]] = {"mean": []}
-        if self.spec.architecture == "decoder":
-            pooled["last"] = []
-        for start in range(0, len(order), batch_size):
-            batch_texts = [texts[index] for index in order[start : start + batch_size]]
+    def encode(self, texts: list[str]) -> EncodedBatch:
+        if self.spec.architecture == "encoder":
             encoded = self.tokenizer(
-                batch_texts,
+                texts,
                 padding=True,
                 truncation=True,
                 max_length=self.max_length,
                 return_special_tokens_mask=True,
                 return_tensors="pt",
             )
-            attention_mask = encoded["attention_mask"].bool().to(self.device)
-            content_mask = attention_mask & ~encoded["special_tokens_mask"].bool().to(
-                self.device
+            attention_mask = encoded["attention_mask"].bool()
+            return EncodedBatch(
+                input_ids=encoded["input_ids"],
+                attention_mask=attention_mask,
+                content_mask=attention_mask & ~encoded["special_tokens_mask"].bool(),
             )
+        content_ids = self.tokenizer(
+            texts,
+            add_special_tokens=False,
+            truncation=True,
+            max_length=self.max_length - 1,
+        )["input_ids"]
+        padded = self.tokenizer.pad(
+            {"input_ids": [ids + [self.end_token_id] for ids in content_ids]},
+            return_tensors="pt",
+        )
+        attention_mask = padded["attention_mask"].bool()
+        content_lengths = torch.tensor([len(ids) for ids in content_ids])
+        positions = torch.arange(attention_mask.shape[1])
+        return EncodedBatch(
+            input_ids=padded["input_ids"],
+            attention_mask=attention_mask,
+            content_mask=attention_mask & (positions < content_lengths.unsqueeze(1)),
+        )
+
+    @jaxtyped(typechecker=beartype)
+    def extract(self, texts: list[str], batch_size: int) -> dict[str, LayerFeatures]:
+        if not texts:
+            raise ValueError("extract needs at least one text.")
+        order = sorted(range(len(texts)), key=lambda index: len(texts[index]))
+        pooled: dict[str, list[np.ndarray]] = {"mean": []}
+        if self.spec.architecture == "decoder":
+            pooled["last"] = []
+        for start in range(0, len(order), batch_size):
+            batch_texts = [texts[index] for index in order[start : start + batch_size]]
+            encoded = self.encode(batch_texts)
+            attention_mask = encoded.attention_mask.to(self.device)
+            content_mask = encoded.content_mask.to(self.device)
             with torch.no_grad():
                 outputs = self.model(
-                    input_ids=encoded["input_ids"].to(self.device),
+                    input_ids=encoded.input_ids.to(self.device),
                     attention_mask=attention_mask,
                     output_hidden_states=True,
                 )

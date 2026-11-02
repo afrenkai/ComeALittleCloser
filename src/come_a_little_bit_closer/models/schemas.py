@@ -1,17 +1,9 @@
 from pathlib import Path
 from typing import Literal, Protocol
 
-import numpy as np
-import torch
-from jaxtyping import Bool, Float16, Float32
 from pydantic import BaseModel, Field
 
 from come_a_little_bit_closer.geometry.schemas import EmbeddingMatrix, EmbeddingVector
-
-type HiddenStates = Float32[torch.Tensor, "batch tokens hidden"]
-type TokenMask = Bool[torch.Tensor, "batch tokens"]
-type PooledStates = Float32[torch.Tensor, "batch hidden"]
-type LayerFeatures = Float16[np.ndarray, "layers items hidden"]
 
 
 class ModelEncoder(Protocol):
@@ -71,14 +63,3 @@ class ArtifactValidation(BaseModel):
     artifact_path: Path
     manifest: EmbeddingManifest
     maximum_norm_error: float = Field(ge=0)
-
-
-class LayerModelSpec(BaseModel):
-    model_id: str
-    family: str
-    stage: str
-    stage_order: int
-    checkpoint: str
-    revision: str
-    architecture: Literal["decoder", "encoder"]
-    random_init: bool = False

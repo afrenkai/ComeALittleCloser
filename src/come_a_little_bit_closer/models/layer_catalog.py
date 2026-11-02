@@ -1,4 +1,4 @@
-from come_a_little_bit_closer.models.schemas import LayerModelSpec
+from come_a_little_bit_closer.models.layer_schemas import LayerModelSpec
 
 
 def layer_model_specs() -> list[LayerModelSpec]:
@@ -10,6 +10,7 @@ def layer_model_specs() -> list[LayerModelSpec]:
         checkpoint="Qwen/Qwen3-0.6B-Base",
         revision="da87bfb608c14b7cf20ba1ce41287e8de496c0cd",
         architecture="decoder",
+        end_token="<|endoftext|>",
     )
     xlmr_base = LayerModelSpec(
         model_id="xlmr-base",
@@ -30,6 +31,7 @@ def layer_model_specs() -> list[LayerModelSpec]:
             checkpoint="Qwen/Qwen3-Embedding-0.6B",
             revision="97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
             architecture="decoder",
+            end_token="<|endoftext|>",
         ),
         LayerModelSpec(
             model_id="qwen3-4b-base",
@@ -39,6 +41,7 @@ def layer_model_specs() -> list[LayerModelSpec]:
             checkpoint="Qwen/Qwen3-4B-Base",
             revision="906bfd4b4dc7f14ee4320094d8b41684abff8539",
             architecture="decoder",
+            end_token="<|endoftext|>",
         ),
         LayerModelSpec(
             model_id="qwen3-4b-embedding",
@@ -48,6 +51,7 @@ def layer_model_specs() -> list[LayerModelSpec]:
             checkpoint="Qwen/Qwen3-Embedding-4B",
             revision="5cf2132abc99cad020ac570b19d031efec650f2b",
             architecture="decoder",
+            end_token="<|endoftext|>",
         ),
         xlmr_base,
         LayerModelSpec(
