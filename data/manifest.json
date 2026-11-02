@@ -1,5 +1,5 @@
 {
-  "acquisition_date": "2026-10-17",
+  "acquisition_date": "2026-11-02",
   "status": "Availability verification before deduplication, annotation, or model evaluation",
   "sources": [
     {
@@ -7,12 +7,12 @@
       "url": "https://de1.api.radio-browser.info/json/stations/search?has_geo_info=true&hidebroken=true&limit=100000&order=name",
       "documentation": "https://docs.radio-browser.info/",
       "filename": "radio-browser-geolocated.json",
-      "sha256": "0a7dd5c2090dd20e1d99087b8e451fcebb178bafb04a357c4e2da71eb5db1c48",
-      "raw_records": 13498,
-      "records_with_numeric_coordinates_in_valid_ranges": 13496,
-      "records_with_exact_rock_tag": 977,
-      "distinct_resolved_stream_urls_before_validation": 11482,
-      "nonempty_country_codes": 188,
+      "sha256": "708d3ab081396dd674e0f8f91cfc7801f96882cf38db27ae6f6d3205891b62b0",
+      "raw_records": 13761,
+      "records_with_numeric_coordinates_in_valid_ranges": 13759,
+      "records_with_exact_rock_tag": 973,
+      "distinct_resolved_stream_urls_before_validation": 11835,
+      "nonempty_country_codes": 184,
       "notes": "A successful stream check is a directory field, not an independent stream test. Coordinate validity checks do not establish factual location accuracy. The live API may change after acquisition."
     },
     {
@@ -20,10 +20,18 @@
       "url": "https://download.geonames.org/export/dump/cities15000.zip",
       "documentation": "https://download.geonames.org/export/dump/readme.txt",
       "filename": "cities15000.zip",
-      "sha256": "3068649d544bacddb18f7d80ebceb20a6970c0948c9a3553c830047f72ae6618",
+      "sha256": "c7b7482b115463874798824f76381f84103233c0a9db9d43efe8501719200dc9",
       "archive_member": "cities15000.txt",
-      "raw_records": 34166,
+      "raw_records": 34196,
       "notes": "The archive is updated regularly; future downloads may differ."
     }
-  ]
+  ],
+  "previous_snapshot": {
+    "acquisition_date": "2026-10-17",
+    "notes": "The 2026-10-17 files were not retained. Results recorded before 2026-11-02 in experiments/*_RUNS.md and LOCATION_FINDINGS.md used them and cannot be reproduced byte-for-byte.",
+    "sha256": {
+      "radio-browser-geolocated.json": "0a7dd5c2090dd20e1d99087b8e451fcebb178bafb04a357c4e2da71eb5db1c48",
+      "cities15000.zip": "3068649d544bacddb18f7d80ebceb20a6970c0948c9a3553c830047f72ae6618"
+    }
+  }
 }
