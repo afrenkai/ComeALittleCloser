@@ -24,6 +24,15 @@
       "archive_member": "cities15000.txt",
       "raw_records": 34196,
       "notes": "The archive is updated regularly; future downloads may differ."
+    },
+    {
+      "name": "GeoNames country info",
+      "url": "https://download.geonames.org/export/dump/countryInfo.txt",
+      "documentation": "https://download.geonames.org/export/dump/readme.txt",
+      "filename": "countryInfo.txt",
+      "sha256": "79f8f59ea01cbb40438bf1856dd6c2ff201f03f8fc72d0530b2646aaf603ef04",
+      "raw_records": 252,
+      "notes": "Records are non-comment lines. Maps ISO country codes (column 0) to names (column 4) for the cities15000 extract. The file is updated regularly; future downloads may differ."
     }
   ],
   "previous_snapshot": {
