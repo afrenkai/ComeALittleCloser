@@ -135,7 +135,14 @@ def run_experiment(config_path: Path) -> None:
     plan.output_directory.mkdir(parents=True, exist_ok=True)
     (plan.output_directory / "frozen-plan.json").write_bytes(config_path.read_bytes())
     manifests = [
-        spatial_split(stations, plan, seed, stats.source_sha256, checksum)
+        spatial_split(
+            station_ids,
+            [station.coordinates for station in stations],
+            plan,
+            seed,
+            stats.source_sha256,
+            checksum,
+        )
         for seed in plan.split_seeds
     ]
     for manifest in manifests:

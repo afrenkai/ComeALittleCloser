@@ -5,9 +5,9 @@ from jaxtyping import jaxtyped
 from come_a_little_bit_closer.evaluation.location_schemas import (
     BlockScores,
     IndexVector,
-    LocationPlan,
     ProbeFeatures,
     ProbeScore,
+    ProbeSettings,
     ProbeTargets,
     RidgeModel,
     SplitManifest,
@@ -51,7 +51,7 @@ def block_means(values: ScoreVector, block_ids: list[str]) -> BlockScores:
 
 
 @jaxtyped(typechecker=beartype)
-def bootstrap_interval(values: ScoreVector, plan: LocationPlan) -> tuple[float, float]:
+def bootstrap_interval(values: ScoreVector, plan: ProbeSettings) -> tuple[float, float]:
     generator = np.random.default_rng(plan.bootstrap_seed)
     draws = generator.integers(0, len(values), (plan.bootstrap_replicates, len(values)))
     limits = np.quantile(values[draws].mean(axis=1), [0.025, 0.975])
@@ -97,7 +97,7 @@ def fit_ridge(
     train_indices: TrainingIndices,
     validation_indices: ValidationIndices,
     block_ids: list[str],
-    plan: LocationPlan,
+    plan: ProbeSettings,
 ) -> RidgeModel:
     if not np.isfinite(features).all() or not all(
         alpha > 0 for alpha in plan.ridge_alphas
@@ -141,7 +141,7 @@ def score_probe(
     targets: ProbeTargets,
     country_errors: ScoreVector,
     manifest: SplitManifest,
-    plan: LocationPlan,
+    plan: ProbeSettings,
     model_id: str,
     condition: str,
     control: str,
