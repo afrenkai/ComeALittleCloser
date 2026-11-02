@@ -7,20 +7,20 @@
 \begin{document}
 \maketitle
 \begin{abstract}
-The query ``nearest rock station'' specifies both semantic eligibility and geographic proximity. We propose a controlled comparison of these requirements across five embedding models, using radio-station metadata, geographic controls, and a bounded audio pilot. We will measure agreement between cosine and Haversine neighborhoods, compare information recoverable from hidden states with the geometry of final embeddings, and evaluate explicit spatial baselines. A deterministic spherical-coordinate encoding provides an exact-arithmetic reference for cosine-based geographic ranking. H3 will be evaluated as a spatial index with discrete adjacency, separately from distance in kilometers. The project will release a versioned evaluation protocol, formal mathematical definitions, and a Radio Garden-inspired interface linking geographic and semantic neighborhoods. Learned geographic adaptation is a secondary experiment conditional on completion of the core benchmark.
+The query ``nearest rock station'' specifies both semantic eligibility and geographic proximity. We propose a controlled comparison of these requirements across six embedding models, using radio-station metadata, geographic controls, a bounded audio pilot, and a held-out audio--image dataset. We will measure agreement between cosine and Haversine neighborhoods, compare information recoverable from hidden states, layer by layer and against base language models, with the geometry of final embeddings, and evaluate explicit spatial baselines. A deterministic spherical-coordinate encoding provides an exact-arithmetic reference for cosine-based geographic ranking. H3 will be evaluated as a spatial index with discrete adjacency, separately from distance in kilometers. The project will release a versioned evaluation protocol, formal mathematical definitions, and a Radio Garden-inspired interface linking geographic and semantic neighborhoods. Geographic adaptation, learned or by amplifying a probe-identified subspace, is a secondary experiment conditional on completion of the core benchmark.
 \end{abstract}
 
 \section{Introduction}
 Embedding retrieval ranks inputs according to a learned representation and a similarity function. Its interpretation of proximity depends on which relations the representation preserves. Shared genre, language, or branding can make two radio stations semantically similar despite geographic separation. For a query that explicitly requests the nearest station, these relations must be evaluated alongside physical distance.
+We will study five questions. First, do embeddings preserve local geographic ordering when candidates already satisfy a genre constraint, and do they encode more location than a station's country? Second, how does that ordering change when location is represented by names, numeric coordinates, or structured spatial features? Third, can geographic information be decoded from intermediate states even when final cosine neighborhoods express it poorly, and where does it disappear? Fourth, does retrieval training remove geographic information that the base language model encodes? Fifth, do audio- and image-capable models preserve distance better or worse than text-only models? The project combines retrieval evaluation with representation analysis under fixed inputs and candidate sets. Audio contributes an additional test of genre relevance; the primary study does not require audio-based geolocation.
 
-We will study three questions. First, do embeddings preserve local geographic ordering when candidates already satisfy a genre constraint? Second, how does that ordering change when location is represented by names, numeric coordinates, or structured spatial features? Third, can geographic information be decoded from intermediate states even when it is poorly expressed in final cosine neighborhoods? The project combines retrieval evaluation with representation analysis under fixed inputs and candidate sets. Audio contributes an additional test of genre relevance; the primary study does not require audio-based geolocation.
-
-\clearpage
+\paragraph{Preliminary evidence.}
+Recorded text-only runs used five frozen models, 11,479 deduplicated Radio Browser stations, 45 MusicBrainz genres, and twelve origins. Metadata-only linear probes recovered coordinates with block-mean errors of 3,478--5,488 km, against 4,005 km for a training-only country-centroid control; no model had a positive lower bound on its paired 95\% bootstrap improvement over that control. With coordinates in the documents, changing the query origin replaced 8--21\% of top-ten neighbors, yet mean regret against genre-matched Haversine retrieval stayed at 3,668--4,141 km. Coordinate text changes retrieval without reliably making it geographic; whether geography is encoded but outweighed by genre is not established.
 \section{Background and problem formulation}
 \subsection{Key paper and research contribution}
-\citet{decoupes2025distortions} evaluate geographical distortions in ten encoder- and decoder-based language models. Their framework considers city-name tokenization, factual geographic knowledge, correspondence between cosine and geographic distances, and regional maps of disparities. On GeoNames-derived city data, they report uneven representation across regions. We adopt the comparison of paired distances and the requirement to report regional variation. Their vocabulary analysis is an indirect coverage proxy and does not establish the content of a model's training corpus.
+\citet{decoupes2025distortions} evaluate geographical distortions in ten encoder- and decoder-based language models. Their framework considers city-name tokenization, factual geographic knowledge, correspondence between cosine and geographic distances, and regional maps of disparities. On GeoNames-derived city data, they report uneven representation across regions, attributed mainly to training-data imbalance. We adopt the comparison of paired distances and the requirement to report regional variation. Their vocabulary analysis is an indirect coverage proxy and does not establish the content of a model's training corpus.
 
-Our extension evaluates query-level retrieval with an explicit geographic target and genre eligibility. It separates access to geographic information from the use of that information in the final retrieval geometry. \citet{gurnee2024space} show that spatial information can be recovered from Llama-2 hidden states, motivating the probe analysis. \citet{li2023geolm} incorporate coordinates and geographic context into language representations, motivating explicit spatial baselines. CLAP supplies an audio--text specialist for the acoustic condition \citep{wu2023clap}. The proposed contribution is this controlled experimental combination, not a new geographic distance or a claim that all semantic neighborhoods should follow geography.
+Our extension evaluates query-level retrieval with an explicit geographic target and genre eligibility. It separates access to geographic information from the use of that information in the final retrieval geometry. \citet{gurnee2024space} show that spatial information can be recovered from Llama-2 hidden states, motivating the probe analysis, though a probe can score well by identifying a place's country. \citet{li2023geolm} incorporate coordinates and geographic context into language representations, motivating explicit spatial baselines. CLAP supplies an audio--text specialist for the acoustic condition \citep{wu2023clap}. The proposed contribution is this controlled experimental combination, not a new geographic distance or a claim that all semantic neighborhoods should follow geography.
 
 \subsection{Stations, queries, and eligibility}
 Let the finite candidate corpus contain stations indexed by stable identifiers $i$. Each station has a reported location $p_i=(\phi_i,\lambda_i)$, text fields $t_i$, a set of advertised genre labels $G_i$, and, where available, an audio excerpt $a_i$. Coordinates in the mathematical definitions are radians. A query specifies an origin $p_q$ and a genre $g_q$. We distinguish the full corpus $\mathcal C$ from the metadata-eligible set
@@ -41,7 +41,6 @@ Zero or nonfinite outputs are recorded as inference failures. A model's query an
 
 In the location-only task, all methods rank the same $\mathcal C_g$. The combined task ranks $\mathcal C$ and measures both genre selection and geographic ordering. Ascending geographic distance and descending model score use station identifier as a deterministic secondary key. A fixed query origin is always supplied explicitly. Changing an application's map position cannot affect an encoder that receives unchanged text.
 
-\clearpage
 \section{Geographic geometry and spatial controls}
 \subsection{Haversine reference}
 For two locations, define latitude and longitude differences as $\Delta\phi=\phi_i-\phi_q$ and $\Delta\lambda=\lambda_i-\lambda_q$. The spherical reference is
@@ -89,10 +88,9 @@ H3 maps locations to hierarchical cells. Its grid distance counts adjacency step
 \end{equation}
 We will apply Haversine reranking inside this pool and measure which reference neighbors were omitted. Resolutions four, five, and six and fixed ring budgets will be selected on development data. Empty pools and traversal failures remain explicit outcomes. The Lean model specifies this partial interface; it does not verify H3's implementation.
 
-\clearpage
 \section{Models, input conditions, and retrieval baselines}
-\subsection{Five frozen encoders}
-The initial model set is specified in Table~\ref{tab:models}. Checkpoint revisions, dependency versions, tokenization, instructions, pooling, and normalization will be frozen before test evaluation. Inference uses each model's native output dimension. BGE-M3 uses its dense embedding; its sparse and multi-vector outputs are outside this comparison. CLAP's text tower is a specialist control, so weak document retrieval alone will not be interpreted as a failure of its intended audio--text task.
+\subsection{Six frozen encoders}
+The initial model set is specified in Table~\ref{tab:models}. Preliminary runs used the first five; Jina has no recorded run. Checkpoint revisions, dependency versions, tokenization, instructions, pooling, and normalization will be frozen before test evaluation. Inference uses each model's native output dimension. BGE-M3 uses its dense embedding; its sparse and multi-vector outputs are outside this comparison. CLAP's text tower is a specialist control, so weak document retrieval alone will not be interpreted as a failure of its intended audio--text task.
 
 \begin{table}[H]
 \centering
@@ -102,11 +100,12 @@ The initial model set is specified in Table~\ref{tab:models}. Checkpoint revisio
 \toprule
 Model & Checkpoint & Evaluated inputs\\
 \midrule
-EmbeddingGemma 2 \citep{embeddinggemma2}&\texttt{google/embeddinggemma-2}&Text; audio\\
+EmbeddingGemma 2 \citep{embeddinggemma2}&\texttt{google/embeddinggemma-2}&Text; audio; image\\
 Qwen3-Embedding \citep{zhang2025qwen}&\texttt{Qwen/Qwen3-Embedding-0.6B}&Text\\
 BGE-M3 \citep{chen2024m3}&\texttt{BAAI/bge-m3}&Text\\
 CLAP \citep{wu2023clap}&\texttt{laion/clap-htsat-unfused}&Text; audio\\
 Multilingual E5 \citep{wang2024e5}&\texttt{intfloat/multilingual-e5-base}&Text\\
+Jina v5 Omni \citep{honicke2026jinav5omni}&\texttt{jinaai/jina-\allowbreak embeddings-\allowbreak v5-omni-nano}&Text; audio; image\\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -129,7 +128,6 @@ v_\alpha(z,p)&=[\sqrt{1-\alpha}\,z;\sqrt\alpha\,u(p)],\label{eq:fusionvector}\\
 \end{align}
 The fused vectors have unit norm under these assumptions. Their inner-product decomposition is formalized in \texttt{ComeCloser.Objectives}. The fusion condition and coordinate-appended text condition receive the same coordinate information, enabling a comparison of supplied geometry with an encoder's treatment of numeric text. The weight sweep will include both endpoints; local sensitivity will be reported rather than inferred from a global average.
 
-\clearpage
 \section{Data construction and internal representations}
 \subsection{Available data and annotation}
 On 17 October 2026, a Radio Browser API acquisition returned 13,498 entries marked geolocated and working, including 977 tagged exactly \texttt{rock}; 13,496 passed coordinate-range checks. The downloaded GeoNames \texttt{cities15000} extract contains 34,166 records \citep{radiobrowser,geonames}. Source URLs and checksums are recorded. These acquisition counts precede deduplication and annotation; no learned-model retrieval results are implied.
@@ -138,10 +136,12 @@ We will retain at most 5,000 stations, sampling by country and available rock, j
 
 The city control will contain 2,000 GeoNames records sampled across geographic regions and population bands. Station queries will use 300 origins, three genre conditions, and three paraphrases, giving at most 2,700 queries. The origin list and candidate manifests will be frozen before model evaluation. Queries lacking ten eligible candidates are excluded from top-ten metrics only, with exclusion rates and first-result outcomes still reported.
 
-\subsection{Spatial separation and audio feasibility}
-Origins, city controls, and station families will be assigned to 60/20/20 training, development, and test partitions using H3 resolution-three blocks. Blocks connected by one station family will be assigned together. Each partition has its own candidate corpus. Paraphrases and audio excerpts from one station stay together. A supplementary country-holdout analysis tests broader transfer. Block separation reduces local leakage but does not establish independence from pretraining data.
+\subsection{Held-out audio--image validation}
+To check that conclusions do not rest on one dataset, we will use SoundingEarth \citep{heidler2023self}: about 48,000 Google Earth images paired with audio, short captions, and collection coordinates. Its captions carry little location-relevant semantics, so we plan to regenerate them with a language model; these are generated annotations, not human labels. Each multimodal encoder embeds a soundscape query and every sample, and its cosine ranking is compared with the Haversine ranking of the nearest samples of that category using the metrics of Section~\ref{sec:evaluation}, reported separately from the station benchmark.
 
-The audio pilot will attempt 150 streams and retain two timestamped ten-second excerpts for up to 100 stations. Two annotators will label audible genre, speech, and uncertainty. Both audio-capable encoders receive the same usable excerpts, resampled according to their published preprocessing. Collection failures and uncertain music labels will be reported. Audio labels describe the excerpt, while metadata labels describe advertised format. Audio has not yet been collected and is not required to complete the geographic study.
+\subsection{Spatial separation and audio feasibility}
+Origins, city controls, and station families will be assigned to 60/20/20 training, development, and test partitions using H3 resolution-three blocks. Blocks connected by one station family will be assigned together. Each partition has its own candidate corpus. Paraphrases and audio excerpts from one station stay together. A supplementary country-holdout analysis tests broader transfer.
+The audio pilot will attempt 150 streams and retain two timestamped ten-second excerpts for up to 100 stations. Two annotators will label audible genre, speech, and uncertainty. All audio-capable encoders receive the same usable excerpts, resampled according to their published preprocessing. Collection failures and uncertain music labels will be reported. Audio labels describe the excerpt, while metadata labels describe advertised format. Audio has not yet been collected and is not required to complete the geographic study.
 
 \subsection{Probing hidden states}
 For name-only city inputs, let $h_j^{(\ell)}\in\mathbb R^{d_\ell}$ denote a pooled hidden state at layer $\ell$. We will inspect five approximately equally spaced depths, the published pooled state, and the final embedding. A ridge probe predicts the spherical target:
@@ -151,10 +151,10 @@ For name-only city inputs, let $h_j^{(\ell)}\in\mathbb R^{d_\ell}$ denote a pool
   +\eta\lVert B\rVert_F^2.
 \label{eq:probe}
 \end{equation}
-Regularization is selected on training/development blocks. Test predictions are normalized before angular evaluation, with zero predictions counted as failures. Identical examples and shuffled-target controls are used across depths. The objective is defined in Lean; optimization and statistical validity are empirical obligations. Accurate held-out decoding with poor cosine neighborhood agreement would indicate recoverable geographic information that the chosen retrieval geometry does not express. It would not establish that a model causally uses that information for retrieval.
+Regularization is selected on training/development blocks. Test predictions are normalized before angular evaluation, with zero predictions counted as failures. Identical examples and shuffled-target controls are used across depths, and probes are also run on station metadata with coordinates removed. A training-only country-centroid predictor tests whether an embedding carries more than country information. Qwen3-Embedding and EmbeddingGemma 2 were trained from base models, so identical probes on Qwen3-0.6B \citep{qwen3technicalreport}, Gemma, and the retrieval-trained encoders ask whether information is lost in pretraining or retrieval training. If no layer encodes location, it was probably never learned; if intermediate layers do but the final embedding does not, it was learned and then discarded. The objective is defined in Lean; optimization and statistical validity are empirical obligations. Accurate held-out decoding with poor cosine neighborhood agreement would indicate recoverable geographic information that the chosen retrieval geometry does not express. It would not establish that a model causally uses that information for retrieval.
 
-\clearpage
 \section{Evaluation protocol}
+\label{sec:evaluation}
 \subsection{Geographic and semantic outcomes}
 For the location-only task, let $N_k^H(q)$ be the first $k$ eligible candidates under the reference ordering and $N_k^m(q)$ the first $k$ under model ranking. We use $k=10$ when at least ten eligible candidates exist. Neighborhood overlap and combined-task genre precision are
 \begin{align}
@@ -183,14 +183,13 @@ H3 candidate filtering will be evaluated before reranking:
 \frac{|N_k^H(q)\cap\mathcal C_{r,b}(q)|}{k}.
 \label{eq:h3recall}
 \end{equation}
-We will report this recall alongside median and tail query latency, candidate count, empty pools, and traversal failures. Timing will separate embedding computation from cached retrieval. No approximate nearest-neighbor index is needed for the initial corpus; exhaustive similarity search prevents index settings from confounding representation comparisons.
+H3 ring adjacency is also evaluated as a second reference neighborhood, reported separately from kilometers. We will report this recall alongside median and tail query latency, candidate count, empty pools, and traversal failures. Timing will separate embedding computation from cached retrieval. No approximate nearest-neighbor index is needed for the initial corpus; exhaustive similarity search prevents index settings from confounding representation comparisons.
 
 All paired comparisons use identical origins, candidate pools, and label policies. Results will be stratified by region, country where supported, station density, and input condition. We will present query-weighted and region-macro averages with sample counts. Paired 95\% confidence intervals will use 1,000 bootstrap resamples of origin blocks, preserving their genres and paraphrases. The final test split will not select checkpoints, spatial weights, probe regularization, or adaptation settings.
 
 \subsection{Controls and interpretation}
-Boundary tests cover antimeridian neighbors, polar coordinates, coincident locations, and antipodes. Repeated place names and nearby cross-border candidates test whether administrative or lexical similarity dominates proximity. Coordinate shuffling supplies a negative control, and spherical-coordinate cosine supplies a deterministic reference. Synthetic cases check algorithms; they are not evidence of learned geographic knowledge. Disagreement is a geographic task error only for queries that explicitly require physical proximity. Distant stations with similar music can remain valid semantic neighbors.
+Boundary tests cover antimeridian neighbors, polar coordinates, coincident locations, and antipodes. Repeated place names and nearby cross-border candidates test whether administrative or lexical similarity dominates proximity. Coordinate shuffling supplies a negative control, and spherical-coordinate cosine supplies a deterministic reference. Two targeted tests separate country knowledge from distance knowledge. For origins near a national border, the border-crossing rate compares how often the truly nearest eligible stations lie in another country with how often a model's top results do. A coordinate-perturbation test shifts query coordinates by 1, 100, and 1,000 km; if a 1 km shift that alters many digits moves the embedding as much as a 1,000 km shift, the model is probably reading coordinates as text. Synthetic cases check algorithms; they are not evidence of learned geographic knowledge. Disagreement is a geographic task error only for queries that explicitly require physical proximity. Distant stations with similar music can remain valid semantic neighbors.
 
-\clearpage
 \section{Optional adaptation, execution plan, and limitations}
 \subsection{A bounded geographic adapter}
 If the core benchmark is complete, we will select one frozen text encoder using development performance and learn a 64-dimensional linear projection. For a nonzero projected vector, define $z_W(x)=Wf_m(x)/\lVert Wf_m(x)\rVert_2$ and $s_W(x,y)=\langle z_W(x),z_W(y)\rangle$. Training uses name-only city inputs, so geographic targets supervise the adapter rather than appearing verbatim in its input. Geographic triplets contain an origin, a nearer positive, and a farther negative, sampled across local and regional distance bands. Their margin loss is
@@ -206,7 +205,7 @@ To discourage arbitrary changes in semantic relationships, we will retain the fr
    \big(s_W(x,y)-s_m(x,y)\big)^2.
 \label{eq:adapter}
 \end{equation}
-The proposed budget is five epochs, three seeds, margin $\mu=0.1$, and a development sweep over $\beta\in\{0.1,1,10\}$. All pairs and triplets are training-only. Zero projected outputs are failures. This objective preserves teacher scores, not independently verified semantic truth; genre precision must therefore be checked separately. Adaptation must be compared with coordinate fusion and distance reranking. A gain over an unmodified encoder alone is insufficient evidence for its practical value.
+The proposed budget is five epochs, three seeds, margin $\mu=0.1$, and a development sweep over $\beta\in\{0.1,1,10\}$. All pairs and triplets are training-only. Zero projected outputs are failures. This objective preserves teacher scores, not independently verified semantic truth; genre precision must therefore be checked separately. A training-free alternative amplifies the component of an embedding lying in the probe-identified geographic subspace before scoring, testing whether proximity can be recovered without lowering genre precision. Adaptation and amplification must be compared with coordinate fusion and distance reranking. A gain over an unmodified encoder alone is insufficient evidence for its practical value.
 
 \subsection{Execution and deliverables}
 \begin{table}[H]
@@ -224,14 +223,13 @@ Week & Completion condition\\
 \end{tabularx}
 \end{table}
 
-Inference will run sequentially on one GPU, beginning with a one-hour pilot to estimate throughput and select batch sizes. Only city controls retain intermediate activations; station experiments cache final embeddings. The initial implementation covers coordinate validation, metadata deduplication, spherical vectors, Haversine distance, and exact ranking. Formal definitions and the coordinate-ranking theorem accompany the numerical tests. Learned-model results will be reported only after the specified runs.
+Inference will run sequentially on one GPU, beginning with a one-hour pilot to estimate throughput and select batch sizes. Only city controls retain intermediate activations; station experiments cache final embeddings. The initial implementation covers coordinate validation, metadata deduplication, spherical vectors, Haversine distance, and exact ranking. Learned-model results will be reported only after the specified runs.
 
-The interface will link each station's map position, model-specific semantic neighborhood, retrieved rank, kilometer distance, source fields, and available audio excerpt. It will use fixed query/candidate manifests and expose exclusion counts. Dimensionality reduction is for inspection; quantitative conclusions use full-dimensional embeddings. Release artifacts will include source checksums, preprocessing and split rules, model revisions, evaluation outputs, and failure records.
+The interface will link each station's map position, model-specific semantic neighborhood, retrieved rank, kilometer distance, source fields, and available audio excerpt. It will use fixed query/candidate manifests and expose exclusion counts. For each search it will show the true nearest stations beside the model's picks, revealing patterns an average error hides, such as results that stop at a national border. Dimensionality reduction is for inspection; quantitative conclusions use full-dimensional embeddings. Release artifacts will include source checksums, preprocessing and split rules, model revisions, evaluation outputs, and failure records.
 
 \subsection{Limitations and conclusion}
 Station coordinates and genre tags can be wrong, and coverage is geographically uneven. The audit addresses only part of this uncertainty; short audio excerpts do not characterize programming distributions. Held-out blocks cannot exclude pretraining overlap. Probe accuracy establishes decodability, and adapter interventions do not isolate a geographic mechanism. The study will distinguish directory accuracy, representation geometry, and supplied spatial information when evaluating explicit proximity queries.
 
-\clearpage
 \bibliography{main}
 \bibliographystyle{tmlr}
 \end{document}
