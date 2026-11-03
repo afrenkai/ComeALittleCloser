@@ -2,10 +2,10 @@ import numpy as np
 import torch
 from beartype import beartype
 from jaxtyping import Float16, Float32, jaxtyped
-from pydantic import BaseModel, ConfigDict
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 
 from come_a_little_bit_closer.models.layer_schemas import (
+    EncodedBatch,
     HiddenStates,
     LayerFeatures,
     LayerModelSpec,
@@ -41,14 +41,6 @@ def checked_float16(values: Float32[np.ndarray, "..."]) -> Float16[np.ndarray, "
     ):
         raise ValueError("Values are non-finite or exceed the float16 range.")
     return values.astype(np.float16)
-
-
-class EncodedBatch(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    input_ids: torch.Tensor
-    attention_mask: torch.Tensor
-    content_mask: torch.Tensor
 
 
 class LayerExtractor:

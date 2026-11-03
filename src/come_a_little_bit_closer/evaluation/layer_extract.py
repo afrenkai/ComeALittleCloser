@@ -12,6 +12,7 @@ import transformers
 
 from come_a_little_bit_closer.data.cities import load_places, place_text
 from come_a_little_bit_closer.evaluation.layer_schemas import (
+    DatasetItems,
     FeatureManifest,
     LayerDataset,
     LayerPlan,
@@ -19,7 +20,6 @@ from come_a_little_bit_closer.evaluation.layer_schemas import (
     TextCondition,
 )
 from come_a_little_bit_closer.evaluation.location_prepare import metadata_document
-from come_a_little_bit_closer.geometry.schemas import Coordinates
 from come_a_little_bit_closer.models.hidden_states import LayerExtractor
 from come_a_little_bit_closer.models.layer_catalog import find_layer_model
 from come_a_little_bit_closer.storage.catalog import StationCatalog, initialize_catalog
@@ -36,21 +36,19 @@ def feature_path(
     return plan.feature_directory / model_id / f"{dataset}-{condition}-{pooling}.npy"
 
 
-def dataset_items(
-    dataset: LayerDataset, condition: TextCondition
-) -> tuple[list[str], list[str], list[Coordinates], list[str], str]:
+def dataset_items(dataset: LayerDataset, condition: TextCondition) -> DatasetItems:
     if dataset == "cities":
         if condition == "metadata":
             raise ValueError("Cities support the name and name-country conditions.")
         archive_path = Path("data/raw/cities15000.zip")
         country_info_path = Path("data/raw/countryInfo.txt")
         places = load_places(archive_path, country_info_path)
-        return (
-            [place.place_id for place in places],
-            [place_text(place, condition) for place in places],
-            [place.coordinates for place in places],
-            [place.country_code for place in places],
-            hashlib.sha256(
+        return DatasetItems(
+            item_ids=[place.place_id for place in places],
+            texts=[place_text(place, condition) for place in places],
+            coordinates=[place.coordinates for place in places],
+            country_codes=[place.country_code for place in places],
+            source_sha256=hashlib.sha256(
                 (
                     hashlib.sha256(archive_path.read_bytes()).hexdigest()
                     + hashlib.sha256(country_info_path.read_bytes()).hexdigest()
@@ -62,12 +60,12 @@ def dataset_items(
     source = DatabaseSettings()
     stats = initialize_catalog(source)
     stations = StationCatalog(source.database_path).stations()
-    return (
-        [station.station_id for station in stations],
-        [metadata_document(station) for station in stations],
-        [station.coordinates for station in stations],
-        [station.country_code for station in stations],
-        stats.source_sha256,
+    return DatasetItems(
+        item_ids=[station.station_id for station in stations],
+        texts=[metadata_document(station) for station in stations],
+        coordinates=[station.coordinates for station in stations],
+        country_codes=[station.country_code for station in stations],
+        source_sha256=stats.source_sha256,
     )
 
 
@@ -179,9 +177,9 @@ def extract_model(plan: LayerPlan, model_id: str, device: str) -> list[Path]:
                     extractor,
                     dataset,
                     condition,
-                    items[0],
-                    items[1],
-                    items[4],
+                    items.item_ids,
+                    items.texts,
+                    items.source_sha256,
                 )
             )
             print(f"Extracted {model_id} {dataset} {condition}", flush=True)

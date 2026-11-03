@@ -357,24 +357,33 @@ def distortion_panel(
 ) -> DistortionPanel:
     if score.pooling is None or score.layer is None:
         raise ValueError("Distortion maps need a fitted layer.")
-    item_ids, _, places, _, source_sha256 = dataset_items(dataset, condition)
+    items = dataset_items(dataset, condition)
     targets = spherical_vectors(
         np.asarray(
-            [[place.latitude, place.longitude] for place in places], dtype=np.float64
+            [[place.latitude, place.longitude] for place in items.coordinates],
+            dtype=np.float64,
         )
     )
     manifest = build_split(
         "random-item",
-        item_ids,
-        places,
+        items.item_ids,
+        items.coordinates,
         plan,
         plan.split_seeds[0],
-        source_sha256,
+        items.source_sha256,
         plan_checksum(config_path),
     )
-    features, _ = load_features(
-        plan, score.model_id, dataset, condition, score.pooling, item_ids, source_sha256
+    features, feature_manifest = load_features(
+        plan,
+        score.model_id,
+        dataset,
+        condition,
+        score.pooling,
+        items.item_ids,
+        items.source_sha256,
     )
+    if score.layer >= feature_manifest.layers:
+        raise ValueError("Scored layer is outside the extracted layers.")
     layer_features = np.asarray(features[score.layer], dtype=np.float64)
     train = split_indices(manifest, "train")
     validation = split_indices(manifest, "validation")
@@ -468,13 +477,11 @@ def km_or_na(score: SeedMeanScore | None) -> str:
     return "n/a" if score is None else f"{score.block_mean_km:,.0f}"
 
 
-def summary_lines(
-    rows: list[LayerProbeScore], plan: LayerPlan, mode: EvaluationMode
-) -> list[str]:
+def summary_lines(rows: list[LayerProbeScore], plan: LayerPlan) -> list[str]:
     lines = [
-        f"# Layerwise probe summary ({mode} mode)",
+        "# Layerwise probe summary (dev mode)",
         "",
-        f"All numbers are **validation ({mode}-mode) results** from the "
+        "All numbers are **validation (dev-mode) results** from the "
         f"`{plan.experiment_id}` plan; they are not held-out test results. "
         "Best layer = maximal seed-mean gain over the country-centroid control "
         "(over pooling and layer), chosen on the same validation items, so gains "
@@ -558,19 +565,18 @@ def summary_lines(
     return lines
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Draw the layerwise probe report.")
-    parser.add_argument(
-        "--config", type=Path, default=Path("experiments/layers-v1.json")
-    )
-    parser.add_argument("--mode", choices=["dev", "final"], default="dev")
-    arguments = parser.parse_args()
-    plan = LayerPlan.model_validate_json(arguments.config.read_bytes())
+def write_report(config_path: Path, mode: EvaluationMode) -> Path:
+    if mode == "final":
+        raise ValueError(
+            "Final-mode reporting is not implemented; final results must be "
+            "reported from the frozen cells explicitly."
+        )
+    plan = LayerPlan.model_validate_json(config_path.read_bytes())
     palette = StagePalette()
-    rows = load_scores(plan, arguments.mode)
+    rows = load_scores(plan, mode)
     if not rows:
         raise FileNotFoundError("No scored models found for this mode.")
-    directory = plan.output_directory / arguments.mode / "report"
+    directory = plan.output_directory / mode / "report"
     directory.mkdir(parents=True, exist_ok=True)
     present = {row.model_id for row in rows}
     missing = [model_id for model_id in plan.model_ids if model_id not in present]
@@ -609,9 +615,7 @@ def main() -> None:
                 continue
             draw_distortion(
                 [
-                    distortion_panel(
-                        plan, arguments.config, score, "cities", "name-country"
-                    )
+                    distortion_panel(plan, config_path, score, "cities", "name-country")
                     for score in [by_stage["base"], by_stage["retrieval"]]
                 ],
                 family,
@@ -625,10 +629,18 @@ def main() -> None:
             )
         else:
             print("Skipping stage-trajectory.png: xlmr-large is missing.")
-    (directory / "summary.md").write_text(
-        "\n".join(summary_lines(rows, plan, arguments.mode)) + "\n"
+    (directory / "summary.md").write_text("\n".join(summary_lines(rows, plan)) + "\n")
+    return directory
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Draw the layerwise probe report.")
+    parser.add_argument(
+        "--config", type=Path, default=Path("experiments/layers-v1.json")
     )
-    print(directory, flush=True)
+    parser.add_argument("--mode", choices=["dev", "final"], default="dev")
+    arguments = parser.parse_args()
+    print(write_report(arguments.config, arguments.mode), flush=True)
 
 
 if __name__ == "__main__":

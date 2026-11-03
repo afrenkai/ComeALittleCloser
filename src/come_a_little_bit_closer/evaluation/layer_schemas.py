@@ -5,7 +5,11 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from come_a_little_bit_closer.evaluation.location_schemas import ProbeSettings
-from come_a_little_bit_closer.geometry.schemas import CoordinateMatrix, ScoreVector
+from come_a_little_bit_closer.geometry.schemas import (
+    CoordinateMatrix,
+    Coordinates,
+    ScoreVector,
+)
 from come_a_little_bit_closer.models.layer_schemas import LayerModelSpec
 
 type LayerDataset = Literal["cities", "stations"]
@@ -24,6 +28,14 @@ class FinalCell(BaseModel):
     layer: int = Field(ge=0)
 
 
+class DatasetItems(BaseModel):
+    item_ids: list[str]
+    texts: list[str]
+    coordinates: list[Coordinates]
+    country_codes: list[str]
+    source_sha256: str
+
+
 class LayerPlan(ProbeSettings):
     experiment_id: str
     model_ids: list[str]
@@ -34,6 +46,24 @@ class LayerPlan(ProbeSettings):
     feature_directory: Path
     output_directory: Path
     final_cells: list[FinalCell] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def conditions_and_final_cells_are_consistent(self) -> "LayerPlan":
+        allowed: dict[LayerDataset, set[TextCondition]] = {
+            "cities": {"name", "name-country"},
+            "stations": {"metadata"},
+        }
+        for dataset, conditions in self.datasets.items():
+            if not set(conditions) <= allowed[dataset]:
+                raise ValueError(f"Invalid conditions for dataset {dataset}.")
+        if len({cell.model_dump_json() for cell in self.final_cells}) != len(
+            self.final_cells
+        ):
+            raise ValueError("Final cells must be unique.")
+        for cell in self.final_cells:
+            if cell.condition not in self.datasets.get(cell.dataset, []):
+                raise ValueError(f"Final cell outside the plan: {cell}")
+        return self
 
 
 class FeatureManifest(BaseModel):

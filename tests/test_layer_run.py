@@ -5,17 +5,20 @@ import pytest
 
 from come_a_little_bit_closer.evaluation import layer_run
 from come_a_little_bit_closer.evaluation.layer_extract import feature_path
+from come_a_little_bit_closer.evaluation.layer_report import write_report
 from come_a_little_bit_closer.evaluation.layer_run import (
     run_model,
     score_country_control,
     score_layer,
 )
 from come_a_little_bit_closer.evaluation.layer_schemas import (
+    DatasetItems,
     FeatureManifest,
     FinalCell,
     LayerPlan,
     LayerProbeScore,
 )
+from come_a_little_bit_closer.evaluation.location_schemas import SplitManifest
 from come_a_little_bit_closer.evaluation.probes import (
     angular_errors,
     block_means,
@@ -134,7 +137,13 @@ def final_setup(
     monkeypatch.setattr(
         layer_run,
         "dataset_items",
-        lambda dataset, condition: (item_ids, [], coordinates, country_codes, "sha"),
+        lambda dataset, condition: DatasetItems(
+            item_ids=item_ids,
+            texts=[],
+            coordinates=coordinates,
+            country_codes=country_codes,
+            source_sha256="sha",
+        ),
     )
     plan = tiny_plan(tmp_path).model_copy(
         update={
@@ -219,3 +228,58 @@ def test_feature_provenance_mismatch_raises(
     )
     with pytest.raises(ValueError, match=message):
         run_model(config_path, "xlmr-base", "final")
+
+
+def test_dev_run_writes_plan_copy_and_split_manifests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = final_setup(tmp_path, monkeypatch)
+    output = run_model(config_path, "xlmr-base", "dev")
+    assert (
+        output.with_name("xlmr-base.plan.json").read_bytes() == config_path.read_bytes()
+    )
+    split_file = output.parent / "splits" / "cities-random-item-1.json"
+    assert SplitManifest.model_validate_json(split_file.read_bytes()).seed == 1
+
+
+def test_final_run_refuses_differing_split_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = final_setup(tmp_path, monkeypatch)
+    split_file = tmp_path / "outputs" / "final" / "splits" / "cities-random-item-1.json"
+    split_file.parent.mkdir(parents=True)
+    split_file.write_text("{}")
+    with pytest.raises(FileExistsError, match="differing final split"):
+        run_model(config_path, "xlmr-base", "final")
+
+
+def test_unequal_items_and_coordinates_raise() -> None:
+    with pytest.raises(ValueError, match="equal length"):
+        random_split(["a"], [], tiny_plan(Path("unused")), 1, "sha", "plan")
+
+
+def test_plan_rejects_inconsistent_final_cells(tmp_path: Path) -> None:
+    plan = tiny_plan(tmp_path)
+    cell = FinalCell(
+        model_id="xlmr-base",
+        dataset="cities",
+        condition="name",
+        pooling="mean",
+        layer=1,
+    )
+    with pytest.raises(ValueError, match="unique"):
+        LayerPlan(**{**plan.model_dump(), "final_cells": [cell, cell]})
+    with pytest.raises(ValueError, match="outside the plan"):
+        LayerPlan(
+            **{
+                **plan.model_dump(),
+                "final_cells": [cell.model_copy(update={"condition": "name-country"})],
+            }
+        )
+    with pytest.raises(ValueError, match="Invalid conditions"):
+        LayerPlan(**{**plan.model_dump(), "datasets": {"stations": ["name"]}})
+
+
+def test_final_mode_report_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="Final-mode reporting is not implemented"):
+        write_report(tmp_path / "unused.json", "final")

@@ -267,15 +267,14 @@ def validate_final_cells(
     return cells
 
 
-def write_rows(path: Path, rows: list[LayerProbeScore]) -> None:
+def write_atomic(path: Path, content: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
-        "w", dir=path.parent, delete=False, suffix=".tmp"
+        "wb", dir=path.parent, delete=False, suffix=".tmp"
     ) as handle:
         temporary_path = Path(handle.name)
         try:
-            for row in rows:
-                handle.write(row.model_dump_json() + "\n")
+            handle.write(content)
             handle.flush()
             os.fchmod(handle.fileno(), 0o640)
         except BaseException:
@@ -284,8 +283,32 @@ def write_rows(path: Path, rows: list[LayerProbeScore]) -> None:
     os.replace(temporary_path, path)
 
 
+def write_rows(path: Path, rows: list[LayerProbeScore]) -> None:
+    write_atomic(path, "".join(row.model_dump_json() + "\n" for row in rows).encode())
+
+
+def split_record(manifest: SplitManifest) -> bytes:
+    return manifest.model_dump_json(indent=2).encode()
+
+
+def split_path(
+    plan: LayerPlan,
+    mode: EvaluationMode,
+    dataset: LayerDataset,
+    kind: SplitKind,
+    seed: int,
+) -> Path:
+    return plan.output_directory / mode / "splits" / f"{dataset}-{kind}-{seed}.json"
+
+
+def refuse_differing_final_split(path: Path, manifest: SplitManifest) -> None:
+    if path.exists() and path.read_bytes() != split_record(manifest):
+        raise FileExistsError(f"A differing final split already exists: {path}")
+
+
 def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
-    plan = LayerPlan.model_validate_json(config_path.read_bytes())
+    plan_bytes = config_path.read_bytes()
+    plan = LayerPlan.model_validate_json(plan_bytes)
     if model_id not in plan.model_ids:
         raise ValueError("Model is outside the frozen analysis plan.")
     output_path = plan.output_directory / mode / f"{model_id}.jsonl"
@@ -304,35 +327,39 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
     controls: list[LayerControl] = ["probe", "permuted-labels"]
     checksum = plan_checksum(config_path)
     rows: list[LayerProbeScore] = []
+    split_records: dict[Path, SplitManifest] = {}
     for dataset, conditions in plan.datasets.items():
         items_by_condition = {
             condition: dataset_items(dataset, condition) for condition in conditions
         }
-        reference_ids, _, reference_coordinates, country_codes, reference_sha256 = (
-            items_by_condition[conditions[0]]
-        )
+        reference = items_by_condition[conditions[0]]
         targets = spherical_vectors(
             np.asarray(
-                [[place.latitude, place.longitude] for place in reference_coordinates],
+                [[place.latitude, place.longitude] for place in reference.coordinates],
                 dtype=np.float64,
             )
         )
         manifests = {
             (kind, seed): build_split(
                 kind,
-                reference_ids,
-                reference_coordinates,
+                reference.item_ids,
+                reference.coordinates,
                 plan,
                 seed,
-                reference_sha256,
+                reference.source_sha256,
                 checksum,
             )
             for kind in plan.split_kinds
             for seed in plan.split_seeds
         }
+        for (kind, seed), manifest in manifests.items():
+            path = split_path(plan, mode, dataset, kind, seed)
+            if mode == "final":
+                refuse_differing_final_split(path, manifest)
+            split_records[path] = manifest
         for condition in conditions:
-            item_ids, _, _, _, source_sha256 = items_by_condition[condition]
-            if item_ids != reference_ids:
+            condition_items = items_by_condition[condition]
+            if condition_items.item_ids != reference.item_ids:
                 raise ValueError("Dataset conditions must share item IDs.")
             controlled = False
             identity = RunIdentity(
@@ -346,7 +373,13 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
             )
             for pooling in poolings:
                 features, feature_manifest = load_features(
-                    plan, model_id, dataset, condition, pooling, item_ids, source_sha256
+                    plan,
+                    model_id,
+                    dataset,
+                    condition,
+                    pooling,
+                    condition_items.item_ids,
+                    condition_items.source_sha256,
                 )
                 layers = scored_layers(
                     plan,
@@ -370,7 +403,11 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
                                 seed=seed,
                                 control="country-centroid",
                                 **score_country_control(
-                                    targets, country_codes, manifest, plan, mode
+                                    targets,
+                                    reference.country_codes,
+                                    manifest,
+                                    plan,
+                                    mode,
                                 ).model_dump(),
                             )
                         )
@@ -391,7 +428,7 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
                                     **score_layer(
                                         layer_features,
                                         targets,
-                                        country_codes,
+                                        reference.country_codes,
                                         manifest,
                                         plan,
                                         mode,
@@ -411,6 +448,9 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
         }
         if scored_cells != expected_cells:
             raise ValueError("Scored cells differ from the frozen final cells.")
+    write_atomic(plan.output_directory / mode / f"{model_id}.plan.json", plan_bytes)
+    for path, manifest in split_records.items():
+        write_atomic(path, split_record(manifest) + b"\n")
     write_rows(output_path, rows)
     return output_path
 

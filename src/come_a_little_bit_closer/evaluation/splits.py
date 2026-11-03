@@ -28,6 +28,8 @@ def spatial_split(
     source_sha256: str,
     plan_sha256: str,
 ) -> SplitManifest:
+    if len(item_ids) != len(coordinates):
+        raise ValueError("Item IDs and coordinates must have equal length.")
     if settings.train_fraction + settings.validation_fraction >= 1:
         raise ValueError("Train and validation fractions must leave a test partition.")
     station_blocks = [
@@ -78,6 +80,8 @@ def random_split(
     source_sha256: str,
     plan_sha256: str,
 ) -> SplitManifest:
+    if len(item_ids) != len(coordinates):
+        raise ValueError("Item IDs and coordinates must have equal length.")
     if settings.train_fraction + settings.validation_fraction >= 1:
         raise ValueError("Train and validation fractions must leave a test partition.")
     train_end = int(len(item_ids) * settings.train_fraction)
