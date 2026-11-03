@@ -160,3 +160,29 @@ Rows per file: qwen3-4b-* and qwen3-8b-* 5,346; qwen3-0.6b-* 4,194; xlmr-large a
 Random-init references: qwen3-0.6b-random 1 [-1, 2] and 4 [-4, 12]; xlmr-base-random 1 [-2, 4] and 1 [-3, 5] (random-item, spatial-block).
 
 Observations limited to what the tables show: within the Qwen3 decoders, residual gain grows with size (0.6B, 4B, 8B) on both splits, and in each size the retrieval model's point estimate is at or above its base model's, with overlapping CIs. Encoder families stay within about 30 km of the centroid with CIs that include or nearly include zero. The same ordering holds on the `name` condition (the probe is given the true country, which is absent from the text): qwen3-8b-embedding 181 [116, 256] and qwen3-8b-base 88 [39, 145] on random-item. On stations metadata (random-item) the 8B pair gives 170 [83, 264] (base) and 179 [82, 287] (retrieval). The `sphere` probe now beats the country centroid for the 4B and 8B retrieval models with last-token pooling (their native embedding vector) on random-item: qwen3-4b-embedding 231 [30, 472], qwen3-8b-embedding 311 [89, 565]; every mean-pooled random-item `sphere` row is still negative. Latlon R-squared rises with size (cities, name, random-item, latitude: 0.452, 0.625, 0.671 for the 0.6B, 4B, 8B base models). On name-country text it is close to the country-centroid reference (random-item latitude 0.953): 0.957 and 0.959 for the 4B and 8B retrieval models, with longitude below the reference (0.972 and 0.975 against 0.981).
+
+## layers-v4 (second and third decoder families: Mistral-7B and Gemma-2-9B pairs)
+
+Plan: `experiments/layers-v4.json` (SHA-256 `f6fdcc8aca625c18556350762c54815efa208a92f42d4132cef7596e20c49559`), which is `layers-v3.json` plus two base/retrieval pairs, written to `outputs/layers-v4`. New models were extracted with `experiments/layers-v4-extract-batch8.json` (SHA-256 `094dceac8276a15f771fea15b44cbc2a09eb33506365388930ac651a4602ce5f`; differs only in `batch_size` 8). All 18 models are probed under the v4 plan so every dev result traces to one plan. Code at commit `0c87d8b` adds the per-model `start_token` (Mistral `<s>`, Gemma `<bos>`, matching each model's own tokenizer) and `attention_implementation` (`eager` for Gemma-2, whose default SDPA path skips attention-logit soft-capping); both are unset for the earlier models, whose features and outputs are unchanged.
+
+Pinned revisions and lineage (from the model cards):
+
+- `mistral-7b-base`: `mistralai/Mistral-7B-v0.1` at `27d67f1b5f57dc0953326b2601d68371d40ea8da`.
+- `e5-mistral`: `intfloat/e5-mistral-7b-instruct` at `d62cc4417be0e3289c03dd459d1ef2d137e2554e`; card: "initialized from Mistral-7B-v0.1".
+- `gemma2-9b-base`: `google/gemma-2-9b` at `33c193028431c2fde6c6e51f29e6f17b60cbfac6` (gated; license accepted on 2026-11-03).
+- `bge-multilingual-gemma2`: `BAAI/bge-multilingual-gemma2` at `8365500e19bc804136f4ad12c2494430239a2d72`; card: trained "based on google/gemma-2-9b".
+
+Jobs (submitted 2026-11-03):
+
+| Job | Role | Outcome | Elapsed | Node |
+| --- | --- | --- | --- | --- |
+| 3297324 | download Mistral pair (`short`) | Completed | 7:57 | c052 |
+| 3297447 | download Gemma pair (`short`) | Completed | 33:20 | c066 |
+| 3297458 | mistral-7b-base extraction, batch 8, L40S | Completed | 18:25 | grs001 |
+| 3297459 | e5-mistral extraction, batch 8, L40S | Completed | 17:45 | grs001 |
+| 3297460 | gemma2-9b-base extraction, batch 8, L40S | Completed | 21:37 | grs001 |
+| 3297461 | bge-multilingual-gemma2 extraction, batch 8, L40S | Completed | 20:43 | grs001 |
+| 3297462-3297475 | dev probes for the 14 earlier models (qwen3-8b-base, qwen3-8b-embedding, qwen3-4b-base, qwen3-4b-embedding, qwen3-0.6b-base, qwen3-0.6b-embedding, qwen3-0.6b-random, xlmr-large, bge-m3-retromae, bge-m3-unsupervised, bge-m3, xlmr-base, xlmr-base-random, e5-base, in job-ID order) | 12 completed by 13:17, byte-identical to layers-v3; the two 8B jobs running | | grs002 |
+| 3297476-3297479 | dev probes for mistral-7b-base, e5-mistral, gemma2-9b-base, bge-multilingual-gemma2 | running or pending | | grs002 |
+
+Extracted features: about 41 GB per Mistral model and 47 GB per Gemma model. Results will be appended after the runs.
