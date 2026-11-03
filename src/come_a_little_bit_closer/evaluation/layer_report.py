@@ -132,14 +132,22 @@ def stage_color(stage: str, palette: StagePalette) -> str:
     return palette.colors[stage]
 
 
-def titled_figure(width: float, height: float, title: str, footnote: str) -> Figure:
+def titled_figure(
+    width: float, height: float, title: str, footnote: str, footer: float = 0.06
+) -> Figure:
     figure = Figure(
         figsize=(width, height),
-        layout=ConstrainedLayoutEngine(rect=(0, 0.06, 1, 0.94)),
+        layout=ConstrainedLayoutEngine(rect=(0, footer, 1, 1 - footer)),
         facecolor="white",
     )
     FigureCanvasAgg(figure)
-    figure.suptitle(title, fontsize=12, fontweight="bold", ha="left", x=0.01)
+    figure.suptitle(
+        textwrap.fill(title, int(width * 7.5)),
+        fontsize=12,
+        fontweight="bold",
+        ha="left",
+        x=0.01,
+    )
     figure.text(
         0.01,
         0.01,
@@ -217,6 +225,7 @@ def draw_depth_curves(
         )
         + "Positive = better than knowing the country. Lines are seed means; bands "
         "are seed-mean 95% block-bootstrap CIs.",
+        0.06 if probe_target == "sphere" else 0.16,
     )
     panels = figure.subplots(
         grid_rows, columns, sharey=True, sharex=True, squeeze=False
@@ -281,14 +290,15 @@ def draw_r2_curves(
     )
     means = seed_means(rows, selection)
     figure = titled_figure(
-        4.6 * len(families),
-        8.2,
+        max(4.6 * len(families), 8.0),
+        9.0,
         "Linear probe R-squared by depth, comparable to Gurnee & Tegmark's R-squared "
         "(ridge onto lat/lon; validation, dev)",
         "Cities, name-country text, mean pooling, random-item split. Ridge probe "
         "onto [latitude, longitude] in degrees; R-squared = 1 - SSE/SST on "
         "validation cities. Longitude R-squared uses raw degrees and ignores "
         "wraparound. Lines are seed means; bands are the min-max across seeds.",
+        0.16,
     )
     panels = figure.subplots(2, len(families), sharey="row", sharex=True, squeeze=False)
     for column, family in enumerate(families):
