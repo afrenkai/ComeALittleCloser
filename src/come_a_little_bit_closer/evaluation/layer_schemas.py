@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from come_a_little_bit_closer.evaluation.location_schemas import ProbeSettings
 from come_a_little_bit_closer.models.layer_schemas import LayerModelSpec
@@ -11,6 +11,7 @@ type TextCondition = Literal["name", "name-country", "metadata"]
 type Pooling = Literal["mean", "last"]
 type SplitKind = Literal["spatial-block", "random-item"]
 type EvaluationMode = Literal["dev", "final"]
+type LayerControl = Literal["probe", "permuted-labels"]
 
 
 class FinalCell(BaseModel):
@@ -81,4 +82,22 @@ class LayerProbeScore(LayerScoreValues, RunIdentity):
     relative_depth: float | None
     split_kind: SplitKind
     seed: int
-    control: Literal["probe", "permuted-labels", "country-centroid"]
+    control: LayerControl | Literal["country-centroid"]
+
+    @model_validator(mode="after")
+    def country_rows_have_no_layer(self) -> "LayerProbeScore":
+        fitted = [
+            self.pooling,
+            self.layer,
+            self.relative_depth,
+            self.selected_alpha,
+        ]
+        if self.control == "country-centroid" and any(
+            value is not None for value in fitted
+        ):
+            raise ValueError("Country-centroid rows carry no probe fields.")
+        if self.control != "country-centroid" and any(
+            value is None for value in fitted
+        ):
+            raise ValueError("Probe rows require pooling, layer, depth, and alpha.")
+        return self

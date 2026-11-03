@@ -122,31 +122,29 @@ def test_country_without_training_items_uses_global_fallback() -> None:
     assert values.block_mean_km == pytest.approx(block_means(errors, blocks).mean())
 
 
-def test_final_mode_refuses_rerun(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def final_setup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    pooling: str = "mean",
+    layer: int = 1,
+    item_suffix: str = "",
+    source_sha256: str = "sha",
+) -> Path:
     item_ids, coordinates, country_codes = synthetic_places(200)
     monkeypatch.setattr(
         layer_run,
         "dataset_items",
-        lambda dataset, condition: (
-            item_ids,
-            [],
-            coordinates,
-            country_codes,
-            "sha",
-        ),
+        lambda dataset, condition: (item_ids, [], coordinates, country_codes, "sha"),
     )
-    plan = tiny_plan(tmp_path)
-    plan = plan.model_copy(
+    plan = tiny_plan(tmp_path).model_copy(
         update={
             "final_cells": [
                 FinalCell(
                     model_id="xlmr-base",
                     dataset="cities",
                     condition="name",
-                    pooling="mean",
-                    layer=1,
+                    pooling=pooling,
+                    layer=layer,
                 )
             ]
         }
@@ -156,8 +154,7 @@ def test_final_mode_refuses_rerun(
     path = feature_path(plan, "xlmr-base", "cities", "name", "mean")
     path.parent.mkdir(parents=True)
     targets = coordinate_matrix(coordinates)
-    features = np.stack([targets, targets * 2]).astype(np.float16)
-    np.save(path, features)
+    np.save(path, np.stack([targets, targets * 2]).astype(np.float16))
     path.with_suffix(".json").write_text(
         FeatureManifest(
             model_id="xlmr-base",
@@ -168,8 +165,8 @@ def test_final_mode_refuses_rerun(
             dataset="cities",
             condition="name",
             pooling="mean",
-            source_sha256="sha",
-            item_ids=item_ids,
+            source_sha256=source_sha256,
+            item_ids=[item_id + item_suffix for item_id in item_ids],
             layers=2,
             hidden=3,
             dtype="float16",
@@ -179,6 +176,13 @@ def test_final_mode_refuses_rerun(
             created_at="now",
         ).model_dump_json()
     )
+    return config_path
+
+
+def test_final_mode_refuses_rerun(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = final_setup(tmp_path, monkeypatch)
     output = run_model(config_path, "xlmr-base", "final")
     rows = [
         LayerProbeScore.model_validate_json(line)
@@ -186,4 +190,32 @@ def test_final_mode_refuses_rerun(
     ]
     assert len(rows) == 3 and {row.mode for row in rows} == {"final"}
     with pytest.raises(FileExistsError):
+        run_model(config_path, "xlmr-base", "final")
+
+
+@pytest.mark.parametrize(("pooling", "layer"), [("last", 1), ("mean", 2)])
+def test_invalid_final_cells_raise_without_writing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pooling: str, layer: int
+) -> None:
+    config_path = final_setup(tmp_path, monkeypatch, pooling, layer)
+    with pytest.raises(ValueError, match="Invalid final cells"):
+        run_model(config_path, "xlmr-base", "final")
+    assert not (tmp_path / "outputs").exists()
+
+
+@pytest.mark.parametrize(
+    ("item_suffix", "source_sha256", "message"),
+    [("x", "sha", "item IDs"), ("", "other", "source checksum")],
+)
+def test_feature_provenance_mismatch_raises(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    item_suffix: str,
+    source_sha256: str,
+    message: str,
+) -> None:
+    config_path = final_setup(
+        tmp_path, monkeypatch, item_suffix=item_suffix, source_sha256=source_sha256
+    )
+    with pytest.raises(ValueError, match=message):
         run_model(config_path, "xlmr-base", "final")

@@ -2,7 +2,6 @@ import argparse
 import os
 import tempfile
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 from beartype import beartype
@@ -15,6 +14,7 @@ from come_a_little_bit_closer.evaluation.layer_extract import (
 from come_a_little_bit_closer.evaluation.layer_schemas import (
     EvaluationMode,
     FeatureManifest,
+    LayerControl,
     LayerDataset,
     LayerPlan,
     LayerProbeScore,
@@ -50,8 +50,7 @@ from come_a_little_bit_closer.evaluation.splits import (
 from come_a_little_bit_closer.geometry.distances import spherical_vectors
 from come_a_little_bit_closer.geometry.schemas import Coordinates, ScoreVector
 from come_a_little_bit_closer.models.layer_catalog import find_layer_model
-
-type LayerControl = Literal["probe", "permuted-labels"]
+from come_a_little_bit_closer.models.layer_schemas import LayerFeatures
 
 
 def evaluated_indices(manifest: SplitManifest, mode: EvaluationMode) -> IndexVector:
@@ -210,6 +209,7 @@ def scored_layers(
     return layers
 
 
+@jaxtyped(typechecker=beartype)
 def load_features(
     plan: LayerPlan,
     model_id: str,
@@ -218,7 +218,7 @@ def load_features(
     pooling: Pooling,
     item_ids: list[str],
     source_sha256: str,
-) -> tuple[np.ndarray, FeatureManifest]:
+) -> tuple[LayerFeatures, FeatureManifest]:
     path = feature_path(plan, model_id, dataset, condition, pooling)
     manifest = FeatureManifest.model_validate_json(
         path.with_suffix(".json").read_bytes()
@@ -238,6 +238,33 @@ def load_features(
     if features.shape != (manifest.layers, len(item_ids), manifest.hidden):
         raise ValueError("Feature array shape differs from its manifest.")
     return features, manifest
+
+
+def validate_final_cells(
+    plan: LayerPlan, model_id: str, poolings: list[Pooling]
+) -> set[tuple[LayerDataset, TextCondition, Pooling, int]]:
+    invalid: list[str] = []
+    cells: set[tuple[LayerDataset, TextCondition, Pooling, int]] = set()
+    for cell in plan.final_cells:
+        if cell.model_id != model_id:
+            continue
+        cells.add((cell.dataset, cell.condition, cell.pooling, cell.layer))
+        if cell.condition not in plan.datasets.get(cell.dataset, []):
+            invalid.append(f"{cell}: dataset/condition outside the plan")
+        elif cell.pooling not in poolings:
+            invalid.append(f"{cell}: pooling unavailable for this model")
+        else:
+            manifest_path = feature_path(
+                plan, model_id, cell.dataset, cell.condition, cell.pooling
+            ).with_suffix(".json")
+            layer_count = FeatureManifest.model_validate_json(
+                manifest_path.read_bytes()
+            ).layers
+            if cell.layer >= layer_count:
+                invalid.append(f"{cell}: layer outside 0..{layer_count - 1}")
+    if invalid:
+        raise ValueError("Invalid final cells: " + "; ".join(invalid))
+    return cells
 
 
 def write_rows(path: Path, rows: list[LayerProbeScore]) -> None:
@@ -271,40 +298,41 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
     poolings: list[Pooling] = (
         ["mean", "last"] if spec.architecture == "decoder" else ["mean"]
     )
+    expected_cells = (
+        validate_final_cells(plan, model_id, poolings) if mode == "final" else set()
+    )
+    controls: list[LayerControl] = ["probe", "permuted-labels"]
     checksum = plan_checksum(config_path)
     rows: list[LayerProbeScore] = []
     for dataset, conditions in plan.datasets.items():
-        reference_ids: list[str] | None = None
-        targets = np.empty((0, 3))
-        country_codes: list[str] = []
-        manifests: dict[tuple[SplitKind, int], SplitManifest] = {}
-        for condition in conditions:
-            item_ids, texts, coordinates, item_countries, source_sha256 = dataset_items(
-                dataset, condition
+        items_by_condition = {
+            condition: dataset_items(dataset, condition) for condition in conditions
+        }
+        reference_ids, _, reference_coordinates, country_codes, reference_sha256 = (
+            items_by_condition[conditions[0]]
+        )
+        targets = spherical_vectors(
+            np.asarray(
+                [[place.latitude, place.longitude] for place in reference_coordinates],
+                dtype=np.float64,
             )
-            if reference_ids is None:
-                reference_ids = item_ids
-                country_codes = item_countries
-                targets = spherical_vectors(
-                    np.asarray(
-                        [[place.latitude, place.longitude] for place in coordinates],
-                        dtype=np.float64,
-                    )
-                )
-                manifests = {
-                    (kind, seed): build_split(
-                        kind,
-                        item_ids,
-                        coordinates,
-                        plan,
-                        seed,
-                        source_sha256,
-                        checksum,
-                    )
-                    for kind in plan.split_kinds
-                    for seed in plan.split_seeds
-                }
-            elif item_ids != reference_ids:
+        )
+        manifests = {
+            (kind, seed): build_split(
+                kind,
+                reference_ids,
+                reference_coordinates,
+                plan,
+                seed,
+                reference_sha256,
+                checksum,
+            )
+            for kind in plan.split_kinds
+            for seed in plan.split_seeds
+        }
+        for condition in conditions:
+            item_ids, _, _, _, source_sha256 = items_by_condition[condition]
+            if item_ids != reference_ids:
                 raise ValueError("Dataset conditions must share item IDs.")
             controlled = False
             identity = RunIdentity(
@@ -349,7 +377,7 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
                 for layer in layers:
                     layer_features = np.asarray(features[layer], dtype=np.float64)
                     for (kind, seed), manifest in manifests.items():
-                        for control in ["probe", "permuted-labels"]:
+                        for control in controls:
                             rows.append(
                                 LayerProbeScore(
                                     **identity.model_dump(),
@@ -375,6 +403,14 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
                         f"Scored {model_id} {dataset} {condition} {pooling} {layer}",
                         flush=True,
                     )
+    if mode == "final":
+        scored_cells = {
+            (row.dataset, row.condition, row.pooling, row.layer)
+            for row in rows
+            if row.control != "country-centroid"
+        }
+        if scored_cells != expected_cells:
+            raise ValueError("Scored cells differ from the frozen final cells.")
     write_rows(output_path, rows)
     return output_path
 
