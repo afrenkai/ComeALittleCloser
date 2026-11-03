@@ -1,0 +1,46 @@
+\documentclass[10pt]{article}
+\usepackage[margin=0.5in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\setlist{nosep,leftmargin=1.2em}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{2pt}
+\pagestyle{empty}
+\newcommand{\head}[1]{\par\vspace{3pt}{\large\bfseries #1}\par\vspace{1pt}}
+
+\begin{document}
+\small
+
+\begin{center}
+{\Large\bfseries Where Do Text Embeddings Keep Geography?\\Layer-wise Probes and Map Views of Base vs.\ Retrieval-Tuned Models}\\[2pt]
+Team N: Artem Frenk (agf6353), Nathan Chen (nsc9305), Tian-hao Zhang (tz3147), Kenta Ploch (kp4197)\quad
+\href{https://github.com/afrenkai/ComeALittleCloser}{github.com/afrenkai/ComeALittleCloser}
+\end{center}
+
+\head{Progress since the proposal}
+\begin{itemize}
+\item \textbf{Probing pipeline (complete).} Ridge probes on every layer's pooled hidden state for 34,196 GeoNames cities and 11,833 radio stations; 10\textdegree{} spatial-block and random splits, 3 seeds, block-bootstrap CIs, a training-only country-centroid control, and a held-out test split that has not been touched. Pinned revisions, data checksums and every cluster job are logged in the repository.
+\item \textbf{Models.} 18 checkpoints: four decoder \emph{base$\to$retrieval} pairs whose model cards name the base (Qwen3 0.6B/4B/8B; Mistral-7B$\to$e5-mistral and Gemma-2-9B$\to$bge-multilingual-gemma2, running now), XLM-R base/large with E5 and the BGE-M3 training stages, and two random-initialization controls.
+\item \textbf{Validation results (14 models; test not yet run).} A \emph{country-residual} probe (offset from the country centroid) shows within-country geography that grows with scale: 12\,/\,24, 120\,/\,152, and 175\,/\,201\,km gain over the country centroid for Qwen3 0.6B, 4B, 8B (base\,/\,retrieval). Encoders stay near 0. Retrieval tuning does not remove this information, and the 8B retrieval vector itself beats the country centroid by 311\,km [89, 565].
+\item \textbf{Visualization.} The globe explorer (origin, genre filter, true-nearest vs.\ model rankings, 3-D embedding view, audio) and static depth-curve and distortion-arrow figures exist.
+\end{itemize}
+
+\head{Response to feedback}
+\begin{enumerate}[label=\textbf{\arabic*.}]
+\item \textbf{Visualization contribution.} Three linked views. \emph{(V1) Globe ranking:} model top-$k$ vs.\ true $k$ nearest drawn as lines from the origin; shows picks that stop at borders or jump to same-language regions, which mean regret hides. \emph{(V2) Layer-by-region map} (new): 10\textdegree{} blocks colored by probe gain over the country centroid, with a layer slider linked to the depth curve and a base$-$retrieval difference mode; shows \emph{where} and \emph{at which layer} geography appears or is lost, which the global average hides. \emph{(V3) Distortion map:} true$\to$predicted arrows per city, exposing pulls toward capitals or continent centers. Evaluation (no IRB): pre-stated case studies, each confirmed quantitatively (e.g.\ per-region gain spread, border-crossing rate), plus a think-aloud expert walkthrough with 2--3 NLP/GIS researchers.
+\item \textbf{Critique of key papers.} \emph{Gurnee \& Tegmark} probe base LMs with $R^2$ on raw latitude/longitude. $R^2$ rewards knowing the country: on our data, the country centroid alone reaches $R^2=0.95$ (latitude) and a \emph{randomly initialized} network 0.78 when the text names the country. Their $R^2$ does not separate country identity from within-country position, and they probe base LMs only, not retrieval embeddings or what retrieval training keeps. \emph{Decoupes et al.} compare cosine and geographic distance on final embeddings only, so absent geography cannot be told apart from geography present in earlier layers but unused; their vocabulary analysis is an indirect proxy. \emph{Gap:} geography beyond the country, by layer and region, before vs.\ after retrieval training.
+\item \textbf{Scope.} Core: (i) layer probes, base vs.\ retrieval; (ii) retrieval proximity metrics; (iii) V1--V3 with case studies. Stretch: audio pilot and SoundingEarth with LLM re-captioning, learned adapter. Dropped: H3 adjacency (10\textdegree{} blocks suffice).
+\item \textbf{Subspace amplification} is dropped. Coordinate perturbation stays as a secondary test: it shows whether rankings respond to coordinate \emph{text}, but cannot say \emph{why} explicit coordinates fail (tokenization, no numeric geometry, or genre dominance).
+\item \textbf{Metrics and framing.} Per (origin, genre) query over the genre-eligible pool: Spearman $\rho$ between cosine and Haversine ranks, overlap@10 with the 10 nearest, and excess mean distance (km) of the top 10, against a random ordering of the same pool (1,000 permutations) and the Haversine sort. We adopt the suggested framing, \emph{which notion of proximity embeddings encode}, and add same-country and same-language proximity as alternative references.
+\item \textbf{Small fixes.} New title; models counted as above (Jina dropped; EmbeddingGemma stays in retrieval only, as it has no released base); typo fixed; SoundingEarth ground truth is each clip's recorded coordinates (stretch only).
+\end{enumerate}
+
+\head{Plan and division of labor}
+\begin{itemize}
+\item \textbf{Owners.} Probing: Tian-hao Zhang. Interface V1--V3: Artem Frenk. Retrieval metrics and baselines: Nathan Chen. Case studies, expert walkthrough, audio stretch: Kenta Ploch.
+\item \textbf{Nov 4--10:} freeze test cells; run the held-out test once; export per-region scores. \textbf{Nov 11--24:} retrieval metrics with random baselines; build V2 and link it to V1. \textbf{Nov 25--Dec 6:} case studies and expert walkthrough. \textbf{Dec 7--20:} paper; stretch goals only if the core is done.
+\end{itemize}
+
+\end{document}
