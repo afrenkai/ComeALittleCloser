@@ -10,6 +10,7 @@ from matplotlib import rc_context
 from matplotlib.axes import Axes
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
+from matplotlib.layout_engine import ConstrainedLayoutEngine
 
 from come_a_little_bit_closer.evaluation.layer_extract import dataset_items
 from come_a_little_bit_closer.evaluation.layer_run import (
@@ -109,11 +110,40 @@ def ordered_families(rows: list[LayerProbeScore], palette: StagePalette) -> list
 
 
 def stage_label(score: SeedMeanScore, palette: StagePalette) -> str:
-    return f"{palette.stage_names.get(score.stage, score.stage)} ({score.model_id})"
+    return f"{stage_name(score.stage, palette)} ({score.model_id})"
+
+
+def stage_name(stage: str, palette: StagePalette) -> str:
+    if stage not in palette.stage_names:
+        raise ValueError(f"Stage {stage!r} has no display name in the palette.")
+    return palette.stage_names[stage]
 
 
 def stage_color(stage: str, palette: StagePalette) -> str:
-    return palette.colors.get(stage, "#000000")
+    if stage not in palette.colors:
+        raise ValueError(f"Stage {stage!r} has no color in the palette.")
+    return palette.colors[stage]
+
+
+def titled_figure(width: float, height: float, title: str, footnote: str) -> Figure:
+    figure = Figure(
+        figsize=(width, height),
+        layout=ConstrainedLayoutEngine(rect=(0, 0.06, 1, 0.94)),
+        facecolor="white",
+    )
+    FigureCanvasAgg(figure)
+    figure.suptitle(title, fontsize=12, fontweight="bold", ha="left", x=0.01)
+    figure.text(
+        0.01,
+        0.01,
+        footnote,
+        fontsize=8.5,
+        ha="left",
+        va="bottom",
+        wrap=True,
+        color="#333333",
+    )
+    return figure
 
 
 def sorted_stage_models(
@@ -155,14 +185,21 @@ def draw_depth_curves(
         pooling="mean",
     )
     means = seed_means(rows, selection)
+    questions = {
+        "spatial-block": "unseen 10-degree regions",
+        "random-item": "random held-out cities",
+    }
     columns = min(len(families), 2)
     grid_rows = math.ceil(len(families) / columns)
-    figure = Figure(
-        figsize=(6.2 * columns, 4.4 * grid_rows + 0.9),
-        layout="constrained",
-        facecolor="white",
+    figure = titled_figure(
+        6.2 * columns,
+        4.4 * grid_rows + 1.1,
+        "Where geography dies: probe gain over the country centroid by depth "
+        f"(validation, dev; {split_kind} split)",
+        f"Cities, name-country text, mean pooling; {questions[split_kind]}. "
+        "Positive = better than knowing the country. Lines are seed means; bands "
+        "are seed-mean 95% block-bootstrap CIs.",
     )
-    FigureCanvasAgg(figure)
     panels = figure.subplots(
         grid_rows, columns, sharey=True, sharex=True, squeeze=False
     ).ravel()
@@ -207,21 +244,6 @@ def draw_depth_curves(
         axes.set_ylabel("Gain over country centroid (km)")
     for axes in panels[-columns:]:
         axes.set_xlabel("Relative depth (layer / last layer)")
-    questions = {
-        "spatial-block": "unseen 10-degree regions",
-        "random-item": "random held-out cities",
-    }
-    figure.suptitle(
-        "Where geography dies: probe gain over the country centroid by depth\n"
-        f"Validation (dev) results, {split_kind} split ({questions[split_kind]}), "
-        "cities with name-country text, mean pooling. Positive = better than knowing "
-        "the country. Lines are seed means; bands are seed-mean 95% bootstrap CIs "
-        "over blocks.",
-        fontsize=11,
-        ha="left",
-        x=0.01,
-        wrap=True,
-    )
     figure.savefig(path, dpi=200)
 
 
@@ -238,8 +260,15 @@ def draw_trajectory(
     rows: list[LayerProbeScore], family: str, palette: StagePalette, path: Path
 ) -> None:
     split_kinds: list[SplitKind] = ["spatial-block", "random-item"]
-    figure = Figure(figsize=(11, 5.4), layout="constrained", facecolor="white")
-    FigureCanvasAgg(figure)
+    figure = titled_figure(
+        11,
+        5.8,
+        f"{family} training stages: gain at each stage's best layer "
+        "(validation, dev)",
+        "Cities, name-country text, mean pooling. Layer chosen per stage by maximal "
+        "seed-mean gain on the same validation items, so values are optimistic. "
+        "Bars are seed-mean 95% block-bootstrap CIs.",
+    )
     panels = figure.subplots(1, 2, squeeze=False).ravel()
     for position, split_kind in enumerate(split_kinds):
         axes = panels[position]
@@ -284,7 +313,7 @@ def draw_trajectory(
         axes.set_xticklabels(
             [
                 textwrap.fill(
-                    palette.stage_names.get(score.stage, score.stage),
+                    stage_name(score.stage, palette),
                     width=16,
                     break_on_hyphens=False,
                 )
@@ -299,16 +328,6 @@ def draw_trajectory(
         axes.set_title(f"{split_kind} split", loc="left", fontweight="bold")
         axes.set_ylabel("Best-layer gain over country centroid (km)")
         axes.set_xlabel("Training stage (in order)")
-    figure.suptitle(
-        f"{family} training-stage trajectory: gain at each stage's best layer\n"
-        "Validation (dev) results, cities with name-country text, mean pooling. "
-        "Layer chosen per stage by maximal seed-mean gain on the same validation "
-        "items, so values are optimistic; bars are seed-mean 95% bootstrap CIs.",
-        fontsize=11,
-        ha="left",
-        x=0.01,
-        wrap=True,
-    )
     figure.savefig(path, dpi=200)
 
 
@@ -381,8 +400,16 @@ def draw_distortion(
     palette: StagePalette,
     path: Path,
 ) -> None:
-    figure = Figure(figsize=(10, 9.4), layout="constrained", facecolor="white")
-    FigureCanvasAgg(figure)
+    figure = titled_figure(
+        10,
+        9.4,
+        f"{family}: where the probe moves each city (validation, dev)",
+        "Random-item split, cities, name-country text, mean pooling, each stage's "
+        f"best layer. Grey dots: all {len(panels[0].errors_km):,} validation cities "
+        f"(true positions); arrows: {palette.arrow_sample:,} random validation "
+        "cities, from true to predicted position; arrows crossing +/-180 degrees "
+        "are clipped at the frame.",
+    )
     axes_list = figure.subplots(len(panels), 1, sharex=True, squeeze=False).ravel()
     sample_size = min(palette.arrow_sample, len(panels[0].errors_km))
     chosen = np.sort(
@@ -425,7 +452,7 @@ def draw_distortion(
         axes.set_yticks(range(-60, 81, 30))
         axes.set_ylabel("Latitude (degrees)")
         axes.set_title(
-            f"{palette.stage_names.get(panel.score.stage, panel.score.stage)} "
+            f"{stage_name(panel.score.stage, palette)} "
             f"({panel.score.model_id}), layer {panel.score.layer}: "
             f"median error {np.median(panel.errors_km):,.0f} km, "
             f"mean {np.mean(panel.errors_km):,.0f} km",
@@ -434,19 +461,11 @@ def draw_distortion(
             fontsize=11,
         )
     axes_list[-1].set_xlabel("Longitude (degrees)")
-    figure.suptitle(
-        f"{family}: where the probe moves each city (true to predicted position)\n"
-        "Validation (dev) results, random-item split, cities with name-country text, "
-        "mean pooling, at each stage's best layer. "
-        f"Grey dots: all {len(panels[0].errors_km):,} validation cities (true "
-        f"positions); arrows: {sample_size:,} random validation cities, drawn from "
-        "true to predicted position.",
-        fontsize=11,
-        ha="left",
-        x=0.01,
-        wrap=True,
-    )
     figure.savefig(path, dpi=200)
+
+
+def km_or_na(score: SeedMeanScore | None) -> str:
+    return "n/a" if score is None else f"{score.block_mean_km:,.0f}"
 
 
 def summary_lines(
@@ -533,8 +552,8 @@ def summary_lines(
                 f"{score.gain_over_country_km:,.0f} "
                 f"[{score.gain_ci_low:,.0f}, {score.gain_ci_high:,.0f}] | "
                 f"{score.block_mean_km:,.0f} | "
-                f"{control.block_mean_km if control else float('nan'):,.0f} | "
-                f"{baseline.block_mean_km if baseline else float('nan'):,.0f} |"
+                f"{km_or_na(control)} | "
+                f"{km_or_na(baseline)} |"
             )
     return lines
 
@@ -582,17 +601,18 @@ def main() -> None:
         )
         for family in families:
             best = best_stage_scores(rows, family, selection)
-            stages = sorted(best.values(), key=lambda score: score.stage_order)
-            chosen = [score for score in stages if score.stage_order > 0]
-            if len(chosen) < 2:
-                print(f"Skipping distortion map for {family}: needs two stages.")
+            by_stage = {score.stage: score for score in best.values()}
+            if "base" not in by_stage or "retrieval" not in by_stage:
+                print(
+                    f"Skipping distortion map for {family}: needs base and retrieval."
+                )
                 continue
             draw_distortion(
                 [
                     distortion_panel(
                         plan, arguments.config, score, "cities", "name-country"
                     )
-                    for score in [chosen[0], chosen[-1]]
+                    for score in [by_stage["base"], by_stage["retrieval"]]
                 ],
                 family,
                 plan,
