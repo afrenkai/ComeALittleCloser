@@ -115,3 +115,14 @@ The run-once guard is per output file: do not delete or redirect outputs to reru
 Plan: `experiments/layers-v2.json`. It is `layers-v1.json` plus two extra probe targets, `latlon` (ridge onto latitude and longitude in degrees) and `country-residual` (ridge onto the offset from the training-only country centroid), and writes to `outputs/layers-v2`. Its purpose is to separate "the models lack geography" from "the sphere probe is weak" on the v1 dev results, and to report R-squared for latitude and longitude so results can be compared with Gurnee & Tegmark. It reuses the layers-v1 features (`data/processed/layers-v1/features`); nothing is re-extracted. Dev mode only. Results will be appended here after the runs.
 
 Caveats for reading layers-v2: the country-centroid control is unchanged from v1 (training-only centroid per country, global fallback). On spatial-block splits, when a country's main block is held out, its training centroid can come from a handful of distant stations (for example the Netherlands from a few overseas stations), so the control is weak there, especially for stations (country-centroid R-squared near 0.05 for latitude), and probe gains over it partly reflect fixing broken centroids. `summary.md` reports the share of evaluated items whose country has fewer than 10 training items. `latlon` R-squared is computed from raw ridge outputs in degrees; all other rows convert decoded unit vectors to latitude and longitude. `country-residual` is given the true country label, which is absent from `name` text. The `country-residual` ridge has no target intercept, so its high-alpha limit is the country centroid.
+
+## layers-v3 (scale: Qwen3-8B pair)
+
+Plan: `experiments/layers-v3.json`. It is `layers-v2.json` plus the Qwen3-8B base/retrieval pair, and writes to `outputs/layers-v3`. Its purpose is to test whether within-country geography keeps growing with scale across the Qwen3 0.6B, 4B and 8B families. It runs the full 14-model set on the layers-v1 features directory (`data/processed/layers-v1/features`); only the two new models need extraction. Dev mode only.
+
+Pinned revisions and lineage:
+
+- `qwen3-8b-base`: `Qwen/Qwen3-8B-Base` at `49e3418fbbbca6ecbdf9608b4d22e5a407081db4` (stage base).
+- `qwen3-8b-embedding`: `Qwen/Qwen3-Embedding-8B` at `1d8ad4ca9b3dd8059ad90a75d4983776a23d44af` (stage retrieval); its model card lists `Qwen/Qwen3-8B-Base` as `base_model`.
+
+Results will be appended here after the runs.

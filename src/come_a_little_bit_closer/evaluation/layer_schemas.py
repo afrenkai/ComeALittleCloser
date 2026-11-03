@@ -199,7 +199,13 @@ class StagePalette(BaseModel):
         }
     )
     family_order: list[str] = Field(
-        default_factory=lambda: ["qwen3-0.6b", "qwen3-4b", "xlmr-base", "xlmr-large"]
+        default_factory=lambda: [
+            "qwen3-0.6b",
+            "qwen3-4b",
+            "qwen3-8b",
+            "xlmr-base",
+            "xlmr-large",
+        ]
     )
     arrow_sample: int = 1500
     min_country_train_items: int = 10

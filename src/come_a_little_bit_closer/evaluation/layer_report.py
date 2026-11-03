@@ -270,7 +270,8 @@ def draw_depth_curves(
         axes.set_visible(False)
     for axes in panels[::columns]:
         axes.set_ylabel("Gain over country centroid (km)")
-    for axes in panels[-columns:]:
+    for axes in panels[len(families) - columns : len(families)]:
+        axes.tick_params(labelbottom=True)
         axes.set_xlabel("Relative depth (layer / last layer)")
     figure.savefig(path, dpi=200)
 
