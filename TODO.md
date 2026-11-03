@@ -18,7 +18,7 @@
 - [ ] Compare metadata, audio-inferred, and human genre labels.
 - [ ] Audit station coordinates and station-family membership.
 - [ ] Add buffered geographic splits and a names-only ablation.
-- [ ] Add layerwise hidden-state probes.
+- [ ] Add layerwise hidden-state probes. (Dev run complete, validation results only, recorded in `experiments/LAYERS_RUNS.md`; `final` mode pending.)
 - [ ] Evaluate H3 candidate recall before using it as a retrieval baseline.
 - [ ] Consider geographic adaptation after the audited controls.
 
