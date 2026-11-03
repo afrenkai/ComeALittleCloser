@@ -33,6 +33,7 @@ from come_a_little_bit_closer.evaluation.location_schemas import (
     ProbeTargets,
     RidgeTargets,
     SplitManifest,
+    SubsetRidgeTargets,
     SubsetTargets,
     TargetRidgeModel,
 )
@@ -141,6 +142,7 @@ def fit_layer_probe(
             fallback=coordinate_centroid(targets[train]),
         ),
         plan,
+        probe_target != "country-residual",
     )
 
 
@@ -155,7 +157,7 @@ def layer_predictions(
     rows: IndexVector,
     control: LayerControl,
     probe_target: ProbeTarget,
-) -> tuple[SubsetTargets, float]:
+) -> tuple[SubsetTargets, SubsetRidgeTargets, float]:
     train = split_indices(manifest, "train")
     model = fit_layer_probe(
         features,
@@ -168,13 +170,15 @@ def layer_predictions(
         probe_target,
     )
     centroids = country_predictions(targets, country_codes, train)
+    raw = predict_targets(model, features[rows])
     return (
         decode_predictions(
-            predict_targets(model, features[rows]),
+            raw,
             probe_target,
             centroids[rows],
             coordinate_centroid(targets[train]),
         ),
+        raw,
         model.alpha,
     )
 
@@ -186,14 +190,13 @@ def summarize(
     blocks: list[str],
     plan: LayerPlan,
     selected_alpha: float | None,
-    predictions: SubsetTargets,
+    predicted_coordinates: CoordinateMatrix,
     true_coordinates: CoordinateMatrix,
 ) -> LayerScoreValues:
     means = block_means(errors, blocks)
     gains = block_means(country_errors - errors, blocks)
     low, high = bootstrap_interval(means, plan)
     gain_low, gain_high = bootstrap_interval(gains, plan)
-    predicted_coordinates = vectors_to_coordinates(predictions)
     return LayerScoreValues(
         selected_alpha=selected_alpha,
         evaluated_items=len(errors),
@@ -249,7 +252,7 @@ def score_layer(
     probe_target: ProbeTarget,
 ) -> LayerScoreValues:
     evaluated = evaluated_indices(manifest, mode)
-    predictions, alpha = layer_predictions(
+    predictions, raw, alpha = layer_predictions(
         features,
         targets,
         coordinates,
@@ -269,7 +272,7 @@ def score_layer(
         [manifest.assignments[int(row)].block_id for row in evaluated],
         plan,
         alpha,
-        predictions,
+        raw if probe_target == "latlon" else vectors_to_coordinates(predictions),
         coordinates[evaluated],
     )
 
@@ -294,7 +297,7 @@ def score_country_control(
         [manifest.assignments[int(row)].block_id for row in evaluated],
         plan,
         None,
-        predictions,
+        vectors_to_coordinates(predictions),
         coordinates[evaluated],
     )
 

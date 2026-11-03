@@ -202,6 +202,7 @@ class StagePalette(BaseModel):
         default_factory=lambda: ["qwen3-0.6b", "qwen3-4b", "xlmr-base", "xlmr-large"]
     )
     arrow_sample: int = 1500
+    min_country_train_items: int = 10
     font_settings: dict[str, float | bool] = Field(
         default_factory=lambda: {
             "font.size": 11,

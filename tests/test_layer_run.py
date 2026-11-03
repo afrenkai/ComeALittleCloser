@@ -7,6 +7,7 @@ from come_a_little_bit_closer.evaluation import layer_run
 from come_a_little_bit_closer.evaluation.layer_extract import feature_path
 from come_a_little_bit_closer.evaluation.layer_report import write_report
 from come_a_little_bit_closer.evaluation.layer_run import (
+    layer_predictions,
     run_model,
     score_country_control,
     score_layer,
@@ -26,6 +27,8 @@ from come_a_little_bit_closer.evaluation.probes import (
     block_means,
     coordinate_centroid,
     country_predictions,
+    r_squared,
+    vectors_to_coordinates,
 )
 from come_a_little_bit_closer.evaluation.splits import random_split, split_indices
 from come_a_little_bit_closer.geometry.distances import spherical_vectors
@@ -211,6 +214,52 @@ def test_latlon_probe_recovers_linear_coordinates() -> None:
     assert values.block_mean_km < 100
 
 
+def test_latlon_r_squared_uses_raw_outputs_beyond_wraparound() -> None:
+    generator = np.random.default_rng(4)
+    item_ids = [f"p{index}" for index in range(400)]
+    degrees = np.column_stack(
+        (generator.uniform(-40, 40, 400), generator.uniform(165, 180, 400))
+    )
+    coordinates = [Coordinates(latitude=lat, longitude=lon) for lat, lon in degrees]
+    country_codes = [f"C{index % 4}" for index in range(400)]
+    plan = tiny_plan(Path("unused"))
+    manifest = random_split(item_ids, coordinates, plan, 1, "sha", "plan")
+    features = degrees @ generator.normal(0, 1, (2, 6)) + generator.normal(
+        0, 3, (400, 6)
+    )
+    targets = coordinate_matrix(coordinates)
+    validation = split_indices(manifest, "validation")
+    decoded, raw, alpha = layer_predictions(
+        features,
+        targets,
+        degrees,
+        country_codes,
+        manifest,
+        plan,
+        validation,
+        "probe",
+        "latlon",
+    )
+    values = score_layer(
+        features,
+        targets,
+        degrees,
+        country_codes,
+        manifest,
+        plan,
+        "dev",
+        "probe",
+        "latlon",
+    )
+    assert raw[:, 1].max() > 180
+    assert values.r2_longitude == pytest.approx(
+        r_squared(raw[:, 1], degrees[validation, 1])
+    )
+    assert values.r2_longitude != pytest.approx(
+        r_squared(vectors_to_coordinates(decoded)[:, 1], degrees[validation, 1])
+    )
+
+
 def residual_gain(features_are_signal: bool) -> float:
     item_ids, coordinates, country_codes = synthetic_places(600)
     plan = tiny_plan(Path("unused")).model_copy(update={"ridge_alphas": [1e-3, 1e5]})
@@ -240,7 +289,7 @@ def residual_gain(features_are_signal: bool) -> float:
 
 def test_country_residual_gain_needs_within_country_signal() -> None:
     assert residual_gain(True) > 50
-    assert residual_gain(False) < 5
+    assert abs(residual_gain(False)) < 3
 
 
 def final_setup(

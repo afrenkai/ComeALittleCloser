@@ -110,6 +110,7 @@ def fit_ridge_path(
     block_ids: list[str],
     decoder: PredictionDecoder,
     plan: ProbeSettings,
+    center_targets: bool = True,
 ) -> TargetRidgeModel:
     """Selects alpha by validation block-mean km of decoded unit-vector predictions."""
     if not np.isfinite(features).all() or not all(
@@ -118,13 +119,20 @@ def fit_ridge_path(
         raise ValueError(
             "Ridge requires finite features and strictly positive penalties."
         )
-    feature_mean = features[train_indices].mean(axis=0)
-    target_mean = targets[train_indices].mean(axis=0)
-    training = features[train_indices] - feature_mean
+    training_features = features[train_indices]
+    feature_mean = training_features.mean(axis=0)
+    target_mean = (
+        targets[train_indices].mean(axis=0)
+        if center_targets
+        else np.zeros(targets.shape[1])
+    )
+    training = training_features - feature_mean
     eigenvalues, eigenvectors = np.linalg.eigh(training.T @ training)
     transformed_targets = eigenvectors.T @ (
         training.T @ (targets[train_indices] - target_mean)
     )
+    centered_validation = features[validation_indices] - feature_mean
+    validation_targets = unit_targets[validation_indices]
     validation_blocks = [block_ids[int(index)] for index in validation_indices]
     best_score = float("inf")
     best_model: TargetRidgeModel | None = None
@@ -133,11 +141,9 @@ def fit_ridge_path(
             transformed_targets / (np.maximum(eigenvalues, 0) + alpha)[:, None]
         )
         candidate = TargetRidgeModel(feature_mean, target_mean, weights, alpha)
-        predictions = decoder(predict_targets(candidate, features[validation_indices]))
+        predictions = decoder(centered_validation @ weights + target_mean)
         errors = angular_errors(
-            predictions,
-            unit_targets[validation_indices],
-            plan.geometry.earth_radius_km,
+            predictions, validation_targets, plan.geometry.earth_radius_km
         )
         score = float(block_means(errors, validation_blocks).mean())
         if score < best_score:

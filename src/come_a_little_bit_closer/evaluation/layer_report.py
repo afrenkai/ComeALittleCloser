@@ -1,6 +1,7 @@
 import argparse
 import math
 import textwrap
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -289,6 +290,31 @@ def draw_r2_curves(
         probe_target="latlon",
     )
     means = seed_means(rows, selection)
+    centroid_means = seed_means(
+        rows,
+        ScoreSelection(
+            dataset="cities",
+            condition="name-country",
+            split_kind="random-item",
+            control="country-centroid",
+        ),
+    )
+    centroid_levels = [
+        float(
+            np.mean(
+                [
+                    (
+                        score.r2_latitude.mean
+                        if row_index == 0
+                        else score.r2_longitude.mean
+                    )
+                    for score in centroid_means
+                    if score.r2_latitude is not None and score.r2_longitude is not None
+                ]
+            )
+        )
+        for row_index in range(2)
+    ]
     figure = titled_figure(
         max(4.6 * len(families), 8.0),
         9.0,
@@ -296,8 +322,11 @@ def draw_r2_curves(
         "(ridge onto lat/lon; validation, dev)",
         "Cities, name-country text, mean pooling, random-item split. Ridge probe "
         "onto [latitude, longitude] in degrees; R-squared = 1 - SSE/SST on "
-        "validation cities. Longitude R-squared uses raw degrees and ignores "
-        "wraparound. Lines are seed means; bands are the min-max across seeds.",
+        "validation cities, computed from the raw ridge outputs (before clipping or "
+        "wrapping), as Gurnee & Tegmark do. Longitude R-squared uses raw degrees "
+        "and ignores wraparound. The dotted line is the country-centroid R-squared "
+        "(training-only centroid of the true country). Lines are seed means; "
+        "bands are the min-max across seeds.",
         0.16,
     )
     panels = figure.subplots(2, len(families), sharey="row", sharex=True, squeeze=False)
@@ -338,6 +367,24 @@ def draw_r2_curves(
                     linestyle="--" if stage_order == 0 else "-",
                     label=stage_label(curve[0], palette),
                 )
+            axes.axhline(
+                centroid_levels[row_index],
+                color="#222222",
+                linewidth=1.0,
+                linestyle=":",
+                zorder=1,
+            )
+            axes.annotate(
+                "country centroid",
+                xy=(1.0, centroid_levels[row_index]),
+                xycoords=("axes fraction", "data"),
+                xytext=(-4, -4),
+                textcoords="offset points",
+                ha="right",
+                va="top",
+                fontsize=9.5,
+                color="#222222",
+            )
             axes.grid(axis="y", color="#dddddd", linewidth=0.6)
             axes.set_xlim(0, 1)
             if column == 0:
@@ -628,9 +675,19 @@ def credibility_lines(rows: list[LayerProbeScore]) -> list[str]:
         "is over the country centroid (km), best layer by gain. Lat/lon R-squared "
         "(ridge onto latitude and longitude in degrees, comparable to Gurnee & "
         "Tegmark) is at the layer with the highest mean of the two R-squared "
-        "values. Longitude R-squared uses raw degrees and ignores wraparound. "
+        "values. Latlon R-squared is computed from the raw ridge outputs in degrees "
+        "(before clipping or wrapping); country-centroid R-squared is computed "
+        "from the centroid's unit vectors converted to latitude and longitude. "
+        "Longitude R-squared uses raw degrees and ignores wraparound. "
         "Country-centroid R-squared is the reference: what knowing the country "
-        "alone explains.",
+        "alone explains. Alpha often selects the grid's lower edge (0.01) for "
+        "latlon and sphere probes; with many more items than features that is "
+        "effectively ordinary least squares. † Country-residual results for the "
+        "`name` condition are given the true country label (not present in the "
+        "text). On stations spatial-block splits the country centroid is "
+        "unreliable: when a country's main block is held out, its training "
+        "centroid can come from a few distant stations, so gains there partly "
+        "reflect fixing broken centroids (see the coverage table below).",
         "",
         "| model | dataset | condition | split | residual layer | residual gain "
         "(km) [CI] | latlon layer | latlon R2 lat | latlon R2 lon | "
@@ -639,7 +696,6 @@ def credibility_lines(rows: list[LayerProbeScore]) -> list[str]:
     ]
     cells = sorted({(row.dataset, row.condition, row.split_kind) for row in rows})
     for dataset, condition, split_kind in cells:
-
         residual = best_layers(
             selected_means(
                 rows, dataset, condition, split_kind, "probe", "country-residual"
@@ -663,6 +719,7 @@ def credibility_lines(rows: list[LayerProbeScore]) -> list[str]:
                 + (
                     f"{gain.layer} | {gain.gain_over_country_km:,.0f} "
                     f"[{gain.gain_ci_low:,.0f}, {gain.gain_ci_high:,.0f}]"
+                    + (" †" if condition == "name" else "")
                     if gain
                     else "n/a | n/a"
                 )
@@ -683,7 +740,59 @@ def r2_text(value: SeedRange | None) -> str:
     return "n/a" if value is None else f"{value.mean:.3f}"
 
 
-def summary_lines(rows: list[LayerProbeScore], plan: LayerPlan) -> list[str]:
+def country_coverage_lines(
+    rows: list[LayerProbeScore],
+    plan: LayerPlan,
+    config_path: Path,
+    palette: StagePalette,
+) -> list[str]:
+    lines = [
+        "",
+        "## Country training coverage (validation, dev)",
+        "",
+        "Share of evaluated (validation) items whose country has fewer than "
+        f"{palette.min_country_train_items} training items (or no country code), "
+        "averaged over seeds. These items get a thin or fallback country-centroid.",
+        "",
+        "| dataset | split | share of evaluated items |",
+        "|---|---|---|",
+    ]
+    checksum = plan_checksum(config_path)
+    for dataset in sorted({row.dataset for row in rows}):
+        items = dataset_items(dataset, plan.datasets[dataset][0])
+        for kind in plan.split_kinds:
+            shares: list[float] = []
+            for seed in plan.split_seeds:
+                manifest = build_split(
+                    kind,
+                    items.item_ids,
+                    items.coordinates,
+                    plan,
+                    seed,
+                    items.source_sha256,
+                    checksum,
+                )
+                counts = Counter(
+                    items.country_codes[int(index)]
+                    for index in split_indices(manifest, "train")
+                )
+                validation = split_indices(manifest, "validation")
+                thin = [
+                    counts[items.country_codes[int(index)]]
+                    < palette.min_country_train_items
+                    for index in validation
+                ]
+                shares.append(float(np.mean(thin)))
+            lines.append(f"| {dataset} | {kind} | {np.mean(shares):.3f} |")
+    return lines
+
+
+def summary_lines(
+    rows: list[LayerProbeScore],
+    plan: LayerPlan,
+    config_path: Path,
+    palette: StagePalette,
+) -> list[str]:
     lines = [
         "# Layerwise probe summary (dev mode)",
         "",
@@ -768,7 +877,11 @@ def summary_lines(rows: list[LayerProbeScore], plan: LayerPlan) -> list[str]:
                 f"{km_or_na(control)} | "
                 f"{km_or_na(baseline)} |"
             )
-    return lines + credibility_lines(rows)
+    return (
+        lines
+        + credibility_lines(rows)
+        + country_coverage_lines(rows, plan, config_path, palette)
+    )
 
 
 def write_report(config_path: Path, mode: EvaluationMode) -> Path:
@@ -850,7 +963,9 @@ def write_report(config_path: Path, mode: EvaluationMode) -> Path:
             )
         else:
             print("Skipping stage-trajectory.png: xlmr-large is missing.")
-    (directory / "summary.md").write_text("\n".join(summary_lines(rows, plan)) + "\n")
+    (directory / "summary.md").write_text(
+        "\n".join(summary_lines(rows, plan, config_path, palette)) + "\n"
+    )
     return directory
 
 
