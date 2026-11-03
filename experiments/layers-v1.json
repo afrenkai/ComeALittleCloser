@@ -49,7 +49,7 @@
   "bootstrap_replicates": 1000,
   "bootstrap_seed": 1618,
   "max_length": 256,
-  "batch_size": 256,
+  "batch_size": 32,
   "feature_directory": "data/processed/layers-v1/features",
   "output_directory": "outputs/layers-v1",
   "final_cells": []
