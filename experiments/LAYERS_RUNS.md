@@ -2,14 +2,14 @@
 
 All runs used BC Andromeda (Slurm), partition `gtml` unless noted. `gtml` rejects CPU-only submissions, so probe jobs, which need only CPUs, each held one L4 GPU (`--gres=gpu:l4:1 --cpus-per-task=12`). Two jobs were submitted to `short` and cancelled while pending (more than 10 minutes). Only `dev` mode has been run; **`final` mode has not been run**, and no held-out test results exist.
 
-Plan: `experiments/layers-v1.json`. Two plan hashes apply, both verified from git (`git show f01ee44~1:experiments/layers-v1.json | sha256sum` and `git show f01ee44:experiments/layers-v1.json | sha256sum`):
+Plan: `experiments/layers-v1.json`. Two plan hashes apply, both verified from git (`git show cc497ec~1:experiments/layers-v1.json | sha256sum` and `git show cc497ec:experiments/layers-v1.json | sha256sum`):
 
-- `c83faa375b7dca66eb6ec3ce20f016ada6fa52bc8042faa372fdae52852cabc9` (batch_size 256, before commit `f01ee44` at 2026-11-02 19:06:42 -0500): extraction jobs 3290605 (xlmr-base), 3290645 (xlmr-base-random), 3290646 (e5-base), 3290647 (xlmr-large), 3290648 (bge-m3-retromae), 3290649 (bge-m3-unsupervised), 3290650 (bge-m3), plus the failed qwen3-0.6b jobs 3290642-3290644.
-- `cce8a14c7f24354ae6181d83faea11f75b63a8f817b49ebbba9ab61b1653a025` (batch_size 32, commit `f01ee44` onward): extraction jobs 3290735-3290739 and every dev probe job (3290714, 3290748, 3290754-3290764).
+- `c83faa375b7dca66eb6ec3ce20f016ada6fa52bc8042faa372fdae52852cabc9` (batch_size 256, before commit `cc497ec` at 2026-11-02 19:06:42 -0500): extraction jobs 3290605 (xlmr-base), 3290645 (xlmr-base-random), 3290646 (e5-base), 3290647 (xlmr-large), 3290648 (bge-m3-retromae), 3290649 (bge-m3-unsupervised), 3290650 (bge-m3), plus the failed qwen3-0.6b jobs 3290642-3290644.
+- `cce8a14c7f24354ae6181d83faea11f75b63a8f817b49ebbba9ab61b1653a025` (batch_size 32, commit `cc497ec` onward): extraction jobs 3290735-3290739 and every dev probe job (3290714, 3290748, 3290754-3290764).
 
 Batch size is not recorded in the feature manifests and does not change the features (padding is masked). All extraction jobs ran on one L40S GPU (node grs001, partition `gtml`).
 
-Provenance gap and fix: the dev probe jobs above predate plan and split records. Plan copies (`outputs/layers-v1/<mode>/<model>.plan.json`) and split manifests (`outputs/layers-v1/<mode>/splits/<dataset>-<split_kind>-<seed>.json`) are written by runs after commit `241b625`; the controller will append the rerun job IDs here.
+Provenance gap and fix: the dev probe jobs above predate plan and split records. Plan copies (`outputs/layers-v1/<mode>/<model>.plan.json`) and split manifests (`outputs/layers-v1/<mode>/splits/<dataset>-<split_kind>-<seed>.json`) are written by runs after commit `d654c2a`. Dev probes for all 12 models were re-run at commit `03d5281` under plan `cce8a14c…a025` on gtml (L4 node grs002, 12 CPUs each): jobs 3291121 (xlmr-base), 3291122 (qwen3-0.6b-base), 3291123 (qwen3-0.6b-embedding), 3291124 (qwen3-0.6b-random), 3291125 (xlmr-base-random), 3291126 (e5-base), 3291127 (xlmr-large), 3291128 (bge-m3-retromae), 3291129 (bge-m3-unsupervised), 3291130 (bge-m3), 3291131 (qwen3-4b-embedding), 3291132 (qwen3-4b-base), all COMPLETED, writing 12 plan copies and 12 split manifests. Eleven JSONL files are byte-identical to the earlier runs. `xlmr-base.jsonl` differs only in floating-point rounding (largest relative difference 2e-12, in 330 of 486 rows; every non-float field, including selected alphas, is identical): its earlier run 3290748 used 16 CPUs, the rerun used 12, and BLAS reduction order depends on thread count. Headline numbers are unchanged at the reported precision.
 
 ## Jobs
 
