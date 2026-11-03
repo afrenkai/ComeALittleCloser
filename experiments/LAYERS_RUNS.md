@@ -112,7 +112,9 @@ The run-once guard is per output file: do not delete or redirect outputs to reru
 
 ## layers-v2 (probe credibility)
 
-Plan: `experiments/layers-v2.json`. It is `layers-v1.json` plus two extra probe targets, `latlon` (ridge onto latitude and longitude in degrees) and `country-residual` (ridge onto the offset from the training-only country centroid), and writes to `outputs/layers-v2`. Its purpose is to separate "the models lack geography" from "the sphere probe is weak" on the v1 dev results, and to report R-squared for latitude and longitude so results can be compared with Gurnee & Tegmark. It reuses the layers-v1 features (`data/processed/layers-v1/features`); nothing is re-extracted. Dev mode only. Results will be appended here after the runs.
+Plan: `experiments/layers-v2.json`. It is `layers-v1.json` plus two extra probe targets, `latlon` (ridge onto latitude and longitude in degrees) and `country-residual` (ridge onto the offset from the training-only country centroid), and writes to `outputs/layers-v2`. Its purpose is to separate "the models lack geography" from "the sphere probe is weak" on the v1 dev results, and to report R-squared for latitude and longitude so results can be compared with Gurnee & Tegmark. It reuses the layers-v1 features (`data/processed/layers-v1/features`); nothing is re-extracted. Dev mode only.
+
+Plan SHA-256: `1402669d36140ade8e0cccf1864001a30ba585c7e54648cc3e7cab7c9a47215c`. Dev probes ran on gtml (L4 node grs002, 12 CPUs each), all COMPLETED: 3291657 (qwen3-4b-base, 1:29:12), 3291658 (qwen3-4b-embedding, 1:30:01), 3291659 (qwen3-0.6b-base), 3291660 (qwen3-0.6b-embedding), 3291661 (qwen3-0.6b-random), 3291662 (xlmr-large), 3291663 (bge-m3-retromae), 3291664 (bge-m3-unsupervised), 3291665 (bge-m3), 3291666 (xlmr-base), 3291667 (xlmr-base-random), 3291668 (e5-base). Report job 3291864. The layers-v3 runs below reproduce all twelve layers-v2 JSONL files byte for byte, so layers-v2 results are reported once, in the layers-v3 section.
 
 Caveats for reading layers-v2: the country-centroid control is unchanged from v1 (training-only centroid per country, global fallback). On spatial-block splits, when a country's main block is held out, its training centroid can come from a handful of distant stations (for example the Netherlands from a few overseas stations), so the control is weak there, especially for stations (country-centroid R-squared near 0.05 for latitude), and probe gains over it partly reflect fixing broken centroids. `summary.md` reports the share of evaluated items whose country has fewer than 10 training items. `latlon` R-squared is computed from raw ridge outputs in degrees; all other rows convert decoded unit vectors to latitude and longitude. `country-residual` is given the true country label, which is absent from `name` text. The `country-residual` ridge has no target intercept, so its high-alpha limit is the country centroid.
 
@@ -125,4 +127,36 @@ Pinned revisions and lineage:
 - `qwen3-8b-base`: `Qwen/Qwen3-8B-Base` at `49e3418fbbbca6ecbdf9608b4d22e5a407081db4` (stage base).
 - `qwen3-8b-embedding`: `Qwen/Qwen3-Embedding-8B` at `1d8ad4ca9b3dd8059ad90a75d4983776a23d44af` (stage retrieval); its model card lists `Qwen/Qwen3-8B-Base` as `base_model`.
 
-Results will be appended here after the runs.
+Plan SHA-256: `386088a69671eb413b7f5ef9ba42ca52f37254ba27e64059eda3cc345c7c37e5`. The 8B features were extracted with `experiments/layers-v3-extract-batch8.json` (SHA-256 `110f368b14eef10d76263c5aa3230a4b84e804d0e0a48766aae48f73634c471f`), which differs from layers-v3 only in `batch_size` 8; batch size should change features only through floating-point batching effects, and probe runs read the layers-v3 plan. The 8B features take 39 GB per model.
+
+| Job | Role | Outcome | Elapsed | Node |
+| --- | --- | --- | --- | --- |
+| 3291703 | download Qwen3-8B base and embedding checkpoints (`short`) | Completed | 4:07 | c041 |
+| 3291875 | qwen3-8b-base extraction, batch_size 32, L40S | Failed (CUDA OOM, 44 GB GPU) | 12:42 | grs001 |
+| 3291876 | qwen3-8b-embedding extraction, batch_size 32, L40S | Failed (same OOM) | 12:23 | grs001 |
+| 3291879-3291890 | 12 dev probes for the existing models (first submission) | Cancelled while pending: a `scontrol update` of mail settings on the queued jobs left them in BadConstraints | 0:00 | none assigned |
+| 3291911, 3291912 | 8B extraction on `short` with vr80g/vr144g | Cancelled while pending (moved to batch 8 on gtml) | 0:00 | none assigned |
+| 3291914 | qwen3-8b-base extraction, batch_size 8, L40S | Completed | 6:16 | grs001 |
+| 3291915 | qwen3-8b-embedding extraction, batch_size 8, L40S | Completed | 6:04 | grs001 |
+| 3291929 | qwen3-8b-base dev probe | Completed | 8:48:30 | grs002 |
+| 3291930 | qwen3-8b-embedding dev probe | Completed | 8:48:30 | grs002 |
+| 3295572-3295583 | resubmitted dev probes: qwen3-4b-base, qwen3-4b-embedding, qwen3-0.6b-base, qwen3-0.6b-embedding, qwen3-0.6b-random, xlmr-large, bge-m3-retromae, bge-m3-unsupervised, bge-m3, xlmr-base, xlmr-base-random, e5-base (in job-ID order), `--mem=32G` | All completed | 3:36-1:28:25 | grs002 |
+| 3297183 | dev report (`layer_report --config experiments/layers-v3.json --mode dev`) | Completed | 0:47 | grs002 |
+
+Rows per file: qwen3-4b-* and qwen3-8b-* 5,346; qwen3-0.6b-* 4,194; xlmr-large and bge-m3-* 1,818; xlmr-base, xlmr-base-random, e5-base 954. The report is in `outputs/layers-v3/dev/report/` (`summary.md`, `where-geography-dies{,-random-item,-residual}.png`, `r2-by-depth.png`, `stage-trajectory.png`, `distortion-*.png`).
+
+### Dev-mode headline: country-residual gain
+
+**Validation (dev) results, seed means, best layer and ridge alpha chosen on the same validation items, so gains are optimistic. `final` mode has not been run.** Cities, name-country text, `country-residual` probe; gain is km over the training-only country centroid (best layer over pooling and layer), brackets are seed-mean 95% block-bootstrap CI bounds.
+
+| family | base, random-item | retrieval, random-item | base, spatial-block | retrieval, spatial-block |
+|---|---|---|---|---|
+| qwen3-0.6b | 12 [-6, 31] | 24 [1, 48] | 48 [8, 94] | 48 [2, 100] |
+| qwen3-4b | 120 [68, 178] | 152 [90, 223] | 158 [73, 259] | 192 [83, 321] |
+| qwen3-8b | 175 [110, 254] | 201 [128, 285] | 206 [97, 333] | 226 [102, 380] |
+| xlmr-base (e5-base) | 1 [-2, 4] | 3 [-13, 21] | 19 [-4, 43] | 31 [-2, 72] |
+| xlmr-large (bge-m3) | 1 [-3, 5] | 11 [-8, 32] | 8 [-19, 37] | 21 [-9, 54] |
+
+Random-init references: qwen3-0.6b-random 1 [-1, 2] and 4 [-4, 12]; xlmr-base-random 1 [-2, 4] and 1 [-3, 5] (random-item, spatial-block).
+
+Observations limited to what the tables show: within the Qwen3 decoders, residual gain grows with size (0.6B, 4B, 8B) on both splits, and in each size the retrieval model's point estimate is at or above its base model's, with overlapping CIs. Encoder families stay within about 30 km of the centroid with CIs that include or nearly include zero. The same ordering holds on the `name` condition (the probe is given the true country, which is absent from the text): qwen3-8b-embedding 181 [116, 256] and qwen3-8b-base 88 [39, 145] on random-item. On stations metadata (random-item) the 8B pair gives 170 [83, 264] (base) and 179 [82, 287] (retrieval). The `sphere` probe now beats the country centroid for the 4B and 8B retrieval models with last-token pooling (their native embedding vector) on random-item: qwen3-4b-embedding 231 [30, 472], qwen3-8b-embedding 311 [89, 565]; every mean-pooled random-item `sphere` row is still negative. Latlon R-squared rises with size (cities, name, random-item, latitude: 0.452, 0.625, 0.671 for the 0.6B, 4B, 8B base models). On name-country text it is close to the country-centroid reference (random-item latitude 0.953): 0.957 and 0.959 for the 4B and 8B retrieval models, with longitude below the reference (0.972 and 0.975 against 0.981).
