@@ -51,3 +51,34 @@ class FeatureManifest(BaseModel):
     truncated_items: int
     transformers_version: str
     created_at: str
+
+
+class LayerScoreValues(BaseModel):
+    selected_alpha: float | None
+    evaluated_items: int = Field(gt=0)
+    evaluated_blocks: int = Field(gt=0)
+    block_mean_km: float
+    block_mean_ci_low: float
+    block_mean_ci_high: float
+    gain_over_country_km: float
+    gain_ci_low: float
+    gain_ci_high: float
+
+
+class RunIdentity(BaseModel):
+    model_id: str
+    family: str
+    stage: str
+    stage_order: int
+    dataset: LayerDataset
+    condition: TextCondition
+    mode: EvaluationMode
+
+
+class LayerProbeScore(LayerScoreValues, RunIdentity):
+    pooling: Pooling | None
+    layer: int | None
+    relative_depth: float | None
+    split_kind: SplitKind
+    seed: int
+    control: Literal["probe", "permuted-labels", "country-centroid"]

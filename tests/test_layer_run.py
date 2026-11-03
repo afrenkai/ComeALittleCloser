@@ -1,0 +1,189 @@
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from come_a_little_bit_closer.evaluation import layer_run
+from come_a_little_bit_closer.evaluation.layer_extract import feature_path
+from come_a_little_bit_closer.evaluation.layer_run import (
+    run_model,
+    score_country_control,
+    score_layer,
+)
+from come_a_little_bit_closer.evaluation.layer_schemas import (
+    FeatureManifest,
+    FinalCell,
+    LayerPlan,
+    LayerProbeScore,
+)
+from come_a_little_bit_closer.evaluation.probes import (
+    angular_errors,
+    block_means,
+    coordinate_centroid,
+)
+from come_a_little_bit_closer.evaluation.splits import random_split, split_indices
+from come_a_little_bit_closer.geometry.distances import spherical_vectors
+from come_a_little_bit_closer.geometry.schemas import Coordinates
+from come_a_little_bit_closer.models.layer_catalog import find_layer_model
+
+
+def synthetic_places(count: int) -> tuple[list[str], list[Coordinates], list[str]]:
+    generator = np.random.default_rng(0)
+    centers = generator.uniform([-50, -150], [60, 150], (8, 2))
+    country_index = generator.integers(0, 8, count)
+    points = centers[country_index] + generator.normal(0, 4, (count, 2))
+    coordinates = [
+        Coordinates(latitude=float(np.clip(lat, -89, 89)), longitude=float(lon))
+        for lat, lon in points
+    ]
+    return (
+        [f"p{index}" for index in range(count)],
+        coordinates,
+        [f"C{index}" for index in country_index],
+    )
+
+
+def coordinate_matrix(coordinates: list[Coordinates]) -> np.ndarray:
+    return spherical_vectors(
+        np.asarray([[c.latitude, c.longitude] for c in coordinates], dtype=np.float64)
+    )
+
+
+def tiny_plan(directory: Path) -> LayerPlan:
+    return LayerPlan(
+        experiment_id="tiny",
+        model_ids=["xlmr-base"],
+        datasets={"cities": ["name"]},
+        split_kinds=["random-item"],
+        split_seeds=[1],
+        ridge_alphas=[0.01, 1.0],
+        bootstrap_replicates=50,
+        feature_directory=directory / "features",
+        output_directory=directory / "outputs",
+    )
+
+
+def test_dev_mode_never_reads_test_targets() -> None:
+    item_ids, coordinates, country_codes = synthetic_places(400)
+    plan = tiny_plan(Path("unused"))
+    manifest = random_split(item_ids, coordinates, plan, 1, "sha", "plan")
+    targets = coordinate_matrix(coordinates)
+    test = split_indices(manifest, "test")
+    features = targets.copy()
+    features[test] = np.nan
+    targets[test] = np.nan
+    for control in ["probe", "permuted-labels"]:
+        values = score_layer(
+            features, targets, country_codes, manifest, plan, "dev", control
+        )
+        assert np.isfinite(values.block_mean_km) and np.isfinite(
+            values.gain_over_country_km
+        )
+        assert values.evaluated_items == len(split_indices(manifest, "validation"))
+    control_values = score_country_control(
+        targets, country_codes, manifest, plan, "dev"
+    )
+    assert control_values.gain_over_country_km == 0
+
+
+def test_coordinate_features_beat_country_control() -> None:
+    item_ids, coordinates, country_codes = synthetic_places(400)
+    plan = tiny_plan(Path("unused"))
+    manifest = random_split(item_ids, coordinates, plan, 1, "sha", "plan")
+    targets = coordinate_matrix(coordinates)
+    features = targets + np.random.default_rng(1).normal(0, 0.01, targets.shape)
+    probe = score_layer(
+        features, targets, country_codes, manifest, plan, "dev", "probe"
+    )
+    permuted = score_layer(
+        features, targets, country_codes, manifest, plan, "dev", "permuted-labels"
+    )
+    assert probe.gain_over_country_km > 0
+    assert permuted.gain_over_country_km < probe.gain_over_country_km
+
+
+def test_country_without_training_items_uses_global_fallback() -> None:
+    item_ids, coordinates, country_codes = synthetic_places(100)
+    plan = tiny_plan(Path("unused"))
+    manifest = random_split(item_ids, coordinates, plan, 1, "sha", "plan")
+    validation = split_indices(manifest, "validation")
+    train = split_indices(manifest, "train")
+    for index in validation:
+        country_codes[int(index)] = "ZZ"
+    targets = coordinate_matrix(coordinates)
+    values = score_country_control(targets, country_codes, manifest, plan, "dev")
+    fallback = coordinate_centroid(targets[train])
+    errors = angular_errors(
+        np.tile(fallback, (len(validation), 1)),
+        targets[validation],
+        plan.geometry.earth_radius_km,
+    )
+    blocks = [manifest.assignments[int(index)].block_id for index in validation]
+    assert values.block_mean_km == pytest.approx(block_means(errors, blocks).mean())
+
+
+def test_final_mode_refuses_rerun(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    item_ids, coordinates, country_codes = synthetic_places(200)
+    monkeypatch.setattr(
+        layer_run,
+        "dataset_items",
+        lambda dataset, condition: (
+            item_ids,
+            [],
+            coordinates,
+            country_codes,
+            "sha",
+        ),
+    )
+    plan = tiny_plan(tmp_path)
+    plan = plan.model_copy(
+        update={
+            "final_cells": [
+                FinalCell(
+                    model_id="xlmr-base",
+                    dataset="cities",
+                    condition="name",
+                    pooling="mean",
+                    layer=1,
+                )
+            ]
+        }
+    )
+    config_path = tmp_path / "plan.json"
+    config_path.write_text(plan.model_dump_json())
+    path = feature_path(plan, "xlmr-base", "cities", "name", "mean")
+    path.parent.mkdir(parents=True)
+    targets = coordinate_matrix(coordinates)
+    features = np.stack([targets, targets * 2]).astype(np.float16)
+    np.save(path, features)
+    path.with_suffix(".json").write_text(
+        FeatureManifest(
+            model_id="xlmr-base",
+            model_spec=find_layer_model("xlmr-base"),
+            checkpoint="c",
+            revision="r",
+            random_init=False,
+            dataset="cities",
+            condition="name",
+            pooling="mean",
+            source_sha256="sha",
+            item_ids=item_ids,
+            layers=2,
+            hidden=3,
+            dtype="float16",
+            max_length=256,
+            truncated_items=0,
+            transformers_version="x",
+            created_at="now",
+        ).model_dump_json()
+    )
+    output = run_model(config_path, "xlmr-base", "final")
+    rows = [
+        LayerProbeScore.model_validate_json(line)
+        for line in output.read_text().splitlines()
+    ]
+    assert len(rows) == 3 and {row.mode for row in rows} == {"final"}
+    with pytest.raises(FileExistsError):
+        run_model(config_path, "xlmr-base", "final")
