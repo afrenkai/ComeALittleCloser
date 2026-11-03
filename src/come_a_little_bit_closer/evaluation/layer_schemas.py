@@ -1,9 +1,11 @@
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
 from come_a_little_bit_closer.evaluation.location_schemas import ProbeSettings
+from come_a_little_bit_closer.geometry.schemas import CoordinateMatrix, ScoreVector
 from come_a_little_bit_closer.models.layer_schemas import LayerModelSpec
 
 type LayerDataset = Literal["cities", "stations"]
@@ -101,3 +103,73 @@ class LayerProbeScore(LayerScoreValues, RunIdentity):
         ):
             raise ValueError("Probe rows require pooling, layer, depth, and alpha.")
         return self
+
+
+class ScoreSelection(BaseModel):
+    dataset: LayerDataset
+    condition: TextCondition
+    split_kind: SplitKind
+    control: LayerControl | Literal["country-centroid"]
+    pooling: Pooling | None = None
+
+
+class SeedMeanScore(BaseModel):
+    model_id: str
+    family: str
+    stage: str
+    stage_order: int
+    pooling: Pooling | None
+    layer: int | None
+    relative_depth: float | None
+    block_mean_km: float
+    gain_over_country_km: float
+    gain_ci_low: float
+    gain_ci_high: float
+    seeds: int
+
+
+class StagePalette(BaseModel):
+    """Okabe-Ito colors keyed by stage name, shared by every report figure."""
+
+    colors: dict[str, str] = Field(
+        default_factory=lambda: {
+            "random": "#6e6e6e",
+            "base": "#0072B2",
+            "long-context pretraining": "#009E73",
+            "unsupervised contrastive": "#CC79A7",
+            "retrieval": "#D55E00",
+        }
+    )
+    stage_names: dict[str, str] = Field(
+        default_factory=lambda: {
+            "random": "random init",
+            "base": "base",
+            "long-context pretraining": "long-context (RetroMAE)",
+            "unsupervised contrastive": "unsupervised contrastive",
+            "retrieval": "retrieval-tuned",
+        }
+    )
+    family_order: list[str] = Field(
+        default_factory=lambda: ["qwen3-0.6b", "qwen3-4b", "xlmr-base", "xlmr-large"]
+    )
+    arrow_sample: int = 1500
+    font_settings: dict[str, float | bool] = Field(
+        default_factory=lambda: {
+            "font.size": 11,
+            "axes.titlesize": 12,
+            "axes.labelsize": 11,
+            "legend.fontsize": 9.5,
+            "xtick.labelsize": 10,
+            "ytick.labelsize": 10,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+        }
+    )
+
+
+@dataclass(frozen=True)
+class DistortionPanel:
+    score: SeedMeanScore
+    true_coordinates: CoordinateMatrix
+    predicted_coordinates: CoordinateMatrix
+    errors_km: ScoreVector
