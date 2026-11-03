@@ -54,6 +54,11 @@ class LayerExtractor:
         self.end_token_id = self.tokenizer.convert_tokens_to_ids(
             spec.end_token or self.tokenizer.eos_token
         )
+        self.start_ids = (
+            [self.tokenizer.convert_tokens_to_ids(spec.start_token)]
+            if spec.start_token
+            else []
+        )
         self.tokenizer.padding_side = "right"
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -64,13 +69,17 @@ class LayerExtractor:
             with torch.random.fork_rng(devices=[]):
                 torch.manual_seed(spec.random_seed)
                 self.model = AutoModel.from_config(
-                    config, dtype=torch.float32, trust_remote_code=False
+                    config,
+                    dtype=torch.float32,
+                    attn_implementation=spec.attention_implementation,
+                    trust_remote_code=False,
                 )
         else:
             self.model = AutoModel.from_pretrained(
                 spec.checkpoint,
                 revision=spec.revision,
                 dtype=torch.float32,
+                attn_implementation=spec.attention_implementation,
                 trust_remote_code=False,
             )
         self.model.to(device).eval()
@@ -86,7 +95,8 @@ class LayerExtractor:
             len(ids)
             for ids in self.tokenizer(texts, add_special_tokens=False)["input_ids"]
         ]
-        return sum(length > self.max_length - 1 for length in lengths)
+        content_limit = self.max_length - 1 - len(self.start_ids)
+        return sum(length > content_limit for length in lengths)
 
     def encode(self, texts: list[str]) -> EncodedBatch:
         if self.spec.architecture == "encoder":
@@ -108,19 +118,26 @@ class LayerExtractor:
             texts,
             add_special_tokens=False,
             truncation=True,
-            max_length=self.max_length - 1,
+            max_length=self.max_length - 1 - len(self.start_ids),
         )["input_ids"]
         padded = self.tokenizer.pad(
-            {"input_ids": [ids + [self.end_token_id] for ids in content_ids]},
+            {
+                "input_ids": [
+                    self.start_ids + ids + [self.end_token_id] for ids in content_ids
+                ]
+            },
             return_tensors="pt",
         )
         attention_mask = padded["attention_mask"].bool()
-        content_lengths = torch.tensor([len(ids) for ids in content_ids])
+        content_start = len(self.start_ids)
+        content_ends = torch.tensor([content_start + len(ids) for ids in content_ids])
         positions = torch.arange(attention_mask.shape[1])
         return EncodedBatch(
             input_ids=padded["input_ids"],
             attention_mask=attention_mask,
-            content_mask=attention_mask & (positions < content_lengths.unsqueeze(1)),
+            content_mask=attention_mask
+            & (positions >= content_start)
+            & (positions < content_ends.unsqueeze(1)),
         )
 
     @jaxtyped(typechecker=beartype)

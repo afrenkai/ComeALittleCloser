@@ -186,7 +186,7 @@ def test_random_init_is_float32_deterministic_and_preserves_global_rng(
 def test_registry_pins_every_revision() -> None:
     specs = layer_model_specs()
     ids = [spec.model_id for spec in specs]
-    assert len(ids) == len(set(ids)) == 14
+    assert len(ids) == len(set(ids)) == 18
     assert all(re.fullmatch("[0-9a-f]{40}", spec.revision) for spec in specs)
     assert find_layer_model("bge-m3").stage == "retrieval"
     assert find_layer_model("qwen3-8b-base").stage == "base"
@@ -200,3 +200,23 @@ def test_registry_pins_every_revision() -> None:
         assert len(finals) == 1 and finals[0].stage == "retrieval"
     with pytest.raises(ValueError):
         find_layer_model("missing")
+
+
+def test_decoder_start_token_is_prepended_and_excluded_from_mean(
+    tmp_path: Path,
+) -> None:
+    save_tiny_bert(tmp_path)
+    extractor = LayerExtractor(
+        tiny_spec(
+            tmp_path, architecture="decoder", start_token="[CLS]", end_token="[SEP]"
+        ),
+        device="cpu",
+        max_length=4,
+    )
+    batch = extractor.encode(["rock", "jazz station near rock"])
+    assert batch.input_ids[0, :3].tolist() == [2, 5, 3]
+    assert batch.input_ids[1].tolist() == [2, 6, 7, 3]
+    assert batch.attention_mask.sum(dim=1).tolist() == [3, 4]
+    assert batch.content_mask[:, 0].tolist() == [False, False]
+    assert batch.content_mask.sum(dim=1).tolist() == [1, 2]
+    assert extractor.count_truncated(["jazz station near", "rock station"]) == 1

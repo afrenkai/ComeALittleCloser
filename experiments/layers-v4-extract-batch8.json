@@ -1,0 +1,67 @@
+{
+  "experiment_id": "layers-v4-extract-batch8",
+  "model_ids": [
+    "qwen3-0.6b-base",
+    "qwen3-0.6b-embedding",
+    "qwen3-4b-base",
+    "qwen3-4b-embedding",
+    "qwen3-8b-base",
+    "qwen3-8b-embedding",
+    "mistral-7b-base",
+    "e5-mistral",
+    "gemma2-9b-base",
+    "bge-multilingual-gemma2",
+    "xlmr-base",
+    "e5-base",
+    "xlmr-large",
+    "bge-m3-retromae",
+    "bge-m3-unsupervised",
+    "bge-m3",
+    "qwen3-0.6b-random",
+    "xlmr-base-random"
+  ],
+  "datasets": {
+    "cities": [
+      "name",
+      "name-country"
+    ],
+    "stations": [
+      "metadata"
+    ]
+  },
+  "split_kinds": [
+    "spatial-block",
+    "random-item"
+  ],
+  "probe_targets": [
+    "sphere",
+    "latlon",
+    "country-residual"
+  ],
+  "split_seeds": [
+    1729,
+    2718,
+    3141
+  ],
+  "ridge_alphas": [
+    0.01,
+    0.1,
+    1,
+    10,
+    100,
+    1000,
+    10000,
+    100000,
+    1000000
+  ],
+  "block_degrees": 10,
+  "train_fraction": 0.6,
+  "validation_fraction": 0.2,
+  "bootstrap_replicates": 1000,
+  "bootstrap_seed": 1618,
+  "max_length": 256,
+  "batch_size": 8,
+  "feature_directory": "data/processed/layers-v1/features",
+  "output_directory": "outputs/layers-v4",
+  "final_cells": []
+}

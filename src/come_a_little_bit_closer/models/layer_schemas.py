@@ -21,7 +21,9 @@ class LayerModelSpec(BaseModel):
     architecture: Literal["decoder", "encoder"]
     random_init: bool = False
     random_seed: int = 1729
+    start_token: str | None = None
     end_token: str | None = None
+    attention_implementation: Literal["eager"] | None = None
 
 
 class EncodedBatch(BaseModel):

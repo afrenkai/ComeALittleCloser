@@ -203,6 +203,8 @@ class StagePalette(BaseModel):
             "qwen3-0.6b",
             "qwen3-4b",
             "qwen3-8b",
+            "mistral-7b",
+            "gemma2-9b",
             "xlmr-base",
             "xlmr-large",
         ]
