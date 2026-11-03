@@ -2,7 +2,14 @@
 
 All runs used BC Andromeda (Slurm), partition `gtml` unless noted. `gtml` rejects CPU-only submissions, so probe jobs, which need only CPUs, each held one L4 GPU (`--gres=gpu:l4:1 --cpus-per-task=12`). Two jobs were submitted to `short` and cancelled while pending (more than 10 minutes). Only `dev` mode has been run; **`final` mode has not been run**, and no held-out test results exist.
 
-Plan: `experiments/layers-v1.json`, SHA-256 `cce8a14c7f24354ae6181d83faea11f75b63a8f817b49ebbba9ab61b1653a025`. The extraction batch size was lowered to 32 in commit `f01ee44`.
+Plan: `experiments/layers-v1.json`. Two plan hashes apply, both verified from git (`git show f01ee44~1:experiments/layers-v1.json | sha256sum` and `git show f01ee44:experiments/layers-v1.json | sha256sum`):
+
+- `c83faa375b7dca66eb6ec3ce20f016ada6fa52bc8042faa372fdae52852cabc9` (batch_size 256, before commit `f01ee44` at 2026-11-02 19:06:42 -0500): extraction jobs 3290605 (xlmr-base), 3290645 (xlmr-base-random), 3290646 (e5-base), 3290647 (xlmr-large), 3290648 (bge-m3-retromae), 3290649 (bge-m3-unsupervised), 3290650 (bge-m3), plus the failed qwen3-0.6b jobs 3290642-3290644.
+- `cce8a14c7f24354ae6181d83faea11f75b63a8f817b49ebbba9ab61b1653a025` (batch_size 32, commit `f01ee44` onward): extraction jobs 3290735-3290739 and every dev probe job (3290714, 3290748, 3290754-3290764).
+
+Batch size is not recorded in the feature manifests and does not change the features (padding is masked). All extraction jobs ran on one L40S GPU (node grs001, partition `gtml`).
+
+Provenance gap and fix: the dev probe jobs above predate plan and split records. Plan copies (`outputs/layers-v1/<mode>/<model>.plan.json`) and split manifests (`outputs/layers-v1/<mode>/splits/<dataset>-<split_kind>-<seed>.json`) are written by runs after commit `241b625`; the controller will append the rerun job IDs here.
 
 ## Jobs
 
@@ -11,23 +18,23 @@ Model-to-job assignments for the 3290642-3290650, 3290735-3290739, and 3290754-3
 | Job | Role | Outcome | Elapsed | Node |
 | --- | --- | --- | --- | --- |
 | 3290570 | xlmr-base extraction smoke, max_length 64 (superseded; features deleted) | Completed | 0:34 | grs001 |
-| 3290605 | xlmr-base extraction, max_length 256 | Completed | 0:35 | grs001 |
-| 3290642 | qwen3-0.6b-base extraction, batch_size 256 | Failed (CUDA OOM on station documents after cities files completed) | 1:40 | grs001 |
-| 3290643 | qwen3-0.6b-embedding extraction, batch_size 256 | Failed (same OOM) | 1:40 | grs001 |
-| 3290644 | qwen3-0.6b-random extraction, batch_size 256 | Failed (same OOM) | 1:37 | grs001 |
-| 3290645 | xlmr-base-random extraction | Completed | 0:34 | grs001 |
-| 3290646 | e5-base extraction | Completed | 0:31 | grs001 |
-| 3290647 | xlmr-large extraction | Completed | 0:55 | grs001 |
-| 3290648 | bge-m3-retromae extraction | Completed | 0:57 | grs001 |
-| 3290649 | bge-m3-unsupervised extraction | Completed | 0:57 | grs001 |
-| 3290650 | bge-m3 extraction | Completed | 0:56 | grs001 |
+| 3290605 | xlmr-base extraction, max_length 256, batch_size 256, L40S | Completed | 0:35 | grs001 |
+| 3290642 | qwen3-0.6b-base extraction, batch_size 256, L40S | Failed (CUDA OOM on station documents after cities files completed) | 1:40 | grs001 |
+| 3290643 | qwen3-0.6b-embedding extraction, batch_size 256, L40S | Failed (same OOM) | 1:40 | grs001 |
+| 3290644 | qwen3-0.6b-random extraction, batch_size 256, L40S | Failed (same OOM) | 1:37 | grs001 |
+| 3290645 | xlmr-base-random extraction, batch_size 256, L40S | Completed | 0:34 | grs001 |
+| 3290646 | e5-base extraction, batch_size 256, L40S | Completed | 0:31 | grs001 |
+| 3290647 | xlmr-large extraction, batch_size 256, L40S | Completed | 0:55 | grs001 |
+| 3290648 | bge-m3-retromae extraction, batch_size 256, L40S | Completed | 0:57 | grs001 |
+| 3290649 | bge-m3-unsupervised extraction, batch_size 256, L40S | Completed | 0:57 | grs001 |
+| 3290650 | bge-m3 extraction, batch_size 256, L40S | Completed | 0:56 | grs001 |
 | 3290651 | qwen3-4b-base extraction on `short` | Cancelled while pending (moved to gtml) | 0:00 | none assigned |
 | 3290652 | qwen3-4b-embedding extraction on `short` | Cancelled while pending (moved to gtml) | 0:00 | none assigned |
-| 3290735 | qwen3-0.6b-base extraction, batch_size 32 | Completed | 0:48 | grs001 |
-| 3290736 | qwen3-0.6b-embedding extraction, batch_size 32 | Completed | 0:47 | grs001 |
-| 3290737 | qwen3-0.6b-random extraction, batch_size 32 | Completed | 0:51 | grs001 |
-| 3290738 | qwen3-4b-base extraction, batch_size 32 | Completed | 7:54 | grs001 |
-| 3290739 | qwen3-4b-embedding extraction, batch_size 32 | Completed | 7:40 | grs001 |
+| 3290735 | qwen3-0.6b-base extraction, batch_size 32, L40S | Completed | 0:48 | grs001 |
+| 3290736 | qwen3-0.6b-embedding extraction, batch_size 32, L40S | Completed | 0:47 | grs001 |
+| 3290737 | qwen3-0.6b-random extraction, batch_size 32, L40S | Completed | 0:51 | grs001 |
+| 3290738 | qwen3-4b-base extraction, batch_size 32, L40S | Completed | 7:54 | grs001 |
+| 3290739 | qwen3-4b-embedding extraction, batch_size 32, L40S | Completed | 7:40 | grs001 |
 | 3290679 | xlmr-base dev probe on `short` | Cancelled while pending (more than 10 minutes) | 0:00 | none assigned |
 | 3290714 | xlmr-base dev probe smoke | Completed (superseded by 3290748) | 2:27 | grs002 |
 | 3290748 | xlmr-base dev probe rerun after Task 5 fix | Completed; output byte-identical to 3290714 | 2:34 | grs002 |
@@ -43,7 +50,7 @@ Model-to-job assignments for the 3290642-3290650, 3290735-3290739, and 3290754-3
 | 3290763 | qwen3-4b-embedding dev probe | Completed | 58:25 | grs002 |
 | 3290764 | qwen3-4b-base dev probe (dependency on extraction) | Completed | 57:57 | grs002 |
 
-Extraction used GPU nodes (grs001); the report ran on the login node (about 1.5 minutes, including the qwen3-4b distortion maps that load roughly 3 GB float16 features).
+Extraction used one L40S GPU on grs001 per job; the report ran on the login node (about 1.5 minutes, including the qwen3-4b distortion maps that load roughly 3 GB float16 features).
 
 ## Source checksums
 
@@ -62,7 +69,7 @@ Run with `source ops/bc.env` and `uv run --locked --extra research`. Qwen extrac
 
 ## Dev-mode headline numbers
 
-**These are validation (dev) results. They are exploratory, not test results, unadjusted for multiple comparisons, and the best layer is selected on the same validation items, so best-layer gains are optimistic.** `final` mode has not been run.
+**These are validation (dev) results. They are exploratory, not test results, unadjusted for multiple comparisons, and the best layer is selected on the same validation items, so best-layer gains are optimistic. Ridge alpha is also selected on the same validation items that dev mode scores (the country control has no tuned parameter), so dev gains are optimistic beyond layer selection.** `final` mode has not been run.
 
 Cities, name-country text, mean pooling, probe. Gain is seed-mean km over the country-centroid control (positive means lower error than the centroid); brackets are seed-mean 95% block-bootstrap CI bounds. "Best layer" maximizes seed-mean gain. Permuted-labels gain is at the best layer (a reference; more negative means worse than the centroid). Random-init models (`*-random`) are the random-init references for their families. The spatial-block split holds out 10-degree regions; random-item holds out random cities. In this table the centroid gain is 0 by definition.
 
@@ -94,3 +101,11 @@ Cities, name-country text, mean pooling, probe. Gain is seed-mean km over the co
 | bge-m3 | random-item | 22 | -682 [-951, -447] | 24 | -763 [-1,076, -500] | -6,097 |
 
 Observations limited to what the table shows: on the random-item split every best-layer gain is negative, with CIs excluding zero. On the spatial-block split best-layer gains are positive for qwen3-0.6b-base (CI crosses zero), qwen3-0.6b-embedding (crosses zero), qwen3-4b-base (CI above zero), qwen3-4b-embedding (CI crosses zero), and bge-m3-unsupervised (about 5 km, CI crosses zero); all others are negative. Final-layer gains are lower than best-layer gains for every row where the two layers differ. Cities name-only and stations rows are in `outputs/layers-v1/dev/report/summary.md` (best layer over pooling and layer) and in the JSONL files. The best layer in `summary.md` is chosen over both pooling and layer, so it can differ from the mean-pooling rows above.
+
+## Before running final
+
+1. Freeze the final cells (model, dataset, condition, pooling, layer) in both `experiments/layers-v1.json` `final_cells` and this file.
+2. Record the resulting plan SHA-256 here.
+3. Run `final` once per model (`ops/layers-probe.sbatch <model> final`) and record the job IDs here.
+
+The run-once guard is per output file: do not delete or redirect outputs to rerun. A differing existing split file also blocks a final run. The report refuses `--mode final`; final results are reported explicitly from the frozen cells.
