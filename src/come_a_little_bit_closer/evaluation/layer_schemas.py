@@ -18,6 +18,8 @@ type Pooling = Literal["mean", "last"]
 type SplitKind = Literal["spatial-block", "random-item"]
 type EvaluationMode = Literal["dev", "final"]
 type LayerControl = Literal["probe", "permuted-labels"]
+type ScoreControl = LayerControl | Literal["country-centroid"]
+type ProbeTarget = Literal["sphere", "latlon", "country-residual"]
 
 
 class FinalCell(BaseModel):
@@ -41,6 +43,7 @@ class LayerPlan(ProbeSettings):
     model_ids: list[str]
     datasets: dict[LayerDataset, list[TextCondition]]
     split_kinds: list[SplitKind]
+    probe_targets: list[ProbeTarget] = Field(default_factory=lambda: ["sphere"])
     max_length: int = Field(default=256, gt=1)
     batch_size: int = Field(default=256, gt=0)
     feature_directory: Path
@@ -96,6 +99,8 @@ class LayerScoreValues(BaseModel):
     gain_over_country_km: float
     gain_ci_low: float
     gain_ci_high: float
+    r2_latitude: float | None = None
+    r2_longitude: float | None = None
 
 
 class RunIdentity(BaseModel):
@@ -114,10 +119,15 @@ class LayerProbeScore(LayerScoreValues, RunIdentity):
     relative_depth: float | None
     split_kind: SplitKind
     seed: int
-    control: LayerControl | Literal["country-centroid"]
+    control: ScoreControl
+    probe_target: ProbeTarget = "sphere"
 
     @model_validator(mode="after")
     def country_rows_have_no_layer(self) -> "LayerProbeScore":
+        if self.control == "country-centroid" and self.probe_target != "sphere":
+            raise ValueError("Country-centroid rows carry the sphere target.")
+        if self.control == "permuted-labels" and self.probe_target != "sphere":
+            raise ValueError("Permuted-labels controls run for the sphere target.")
         fitted = [
             self.pooling,
             self.layer,
@@ -139,8 +149,15 @@ class ScoreSelection(BaseModel):
     dataset: LayerDataset
     condition: TextCondition
     split_kind: SplitKind
-    control: LayerControl | Literal["country-centroid"]
+    control: ScoreControl
     pooling: Pooling | None = None
+    probe_target: ProbeTarget = "sphere"
+
+
+class SeedRange(BaseModel):
+    mean: float
+    low: float
+    high: float
 
 
 class SeedMeanScore(BaseModel):
@@ -155,6 +172,8 @@ class SeedMeanScore(BaseModel):
     gain_over_country_km: float
     gain_ci_low: float
     gain_ci_high: float
+    r2_latitude: SeedRange | None = None
+    r2_longitude: SeedRange | None = None
     seeds: int
 
 

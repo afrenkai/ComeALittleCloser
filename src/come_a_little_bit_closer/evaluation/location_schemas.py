@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -18,6 +19,10 @@ type BlockScores = Float64[np.ndarray, "blocks"]
 type ProbeWeights = Float64[np.ndarray, "features 3"]
 type ProbeTargets = Float64[np.ndarray, "samples 3"]
 type ProbeFeatures = Float64[np.ndarray, "samples features"]
+type SubsetTargets = Float64[np.ndarray, "subset 3"]
+type RidgeTargets = Float64[np.ndarray, "samples outputs"]
+type RidgeWeights = Float64[np.ndarray, "features outputs"]
+type PredictionDecoder = Callable[[RidgeTargets], ProbeTargets]
 type DocumentCondition = Literal["explicit-coordinates", "metadata-only"]
 type SplitName = Literal["train", "validation", "test"]
 
@@ -95,6 +100,14 @@ class RidgeModel:
     feature_mean: Float64[np.ndarray, "features"]
     target_mean: Float64[np.ndarray, "3"]
     weights: ProbeWeights
+    alpha: float
+
+
+@dataclass(frozen=True)
+class TargetRidgeModel:
+    feature_mean: Float64[np.ndarray, "features"]
+    target_mean: Float64[np.ndarray, "outputs"]
+    weights: RidgeWeights
     alpha: float
 
 

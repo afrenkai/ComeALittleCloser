@@ -109,3 +109,7 @@ Observations limited to what the table shows: on the random-item split every bes
 3. Run `final` once per model (`ops/layers-probe.sbatch <model> final`) and record the job IDs here.
 
 The run-once guard is per output file: do not delete or redirect outputs to rerun. A differing existing split file also blocks a final run. The report refuses `--mode final`; final results are reported explicitly from the frozen cells.
+
+## layers-v2 (probe credibility)
+
+Plan: `experiments/layers-v2.json`. It is `layers-v1.json` plus two extra probe targets, `latlon` (ridge onto latitude and longitude in degrees) and `country-residual` (ridge onto the offset from the training-only country centroid), and writes to `outputs/layers-v2`. Its purpose is to separate "the models lack geography" from "the sphere probe is weak" on the v1 dev results, and to report R-squared for latitude and longitude so results can be compared with Gurnee & Tegmark. It reuses the layers-v1 features (`data/processed/layers-v1/features`); nothing is re-extracted. Dev mode only. Results will be appended here after the runs.

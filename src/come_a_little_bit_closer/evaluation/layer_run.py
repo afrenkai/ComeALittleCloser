@@ -1,6 +1,7 @@
 import argparse
 import os
 import tempfile
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +21,7 @@ from come_a_little_bit_closer.evaluation.layer_schemas import (
     LayerProbeScore,
     LayerScoreValues,
     Pooling,
+    ProbeTarget,
     RunIdentity,
     SplitKind,
     TextCondition,
@@ -29,8 +31,10 @@ from come_a_little_bit_closer.evaluation.location_schemas import (
     IndexVector,
     ProbeFeatures,
     ProbeTargets,
-    RidgeModel,
+    RidgeTargets,
     SplitManifest,
+    SubsetTargets,
+    TargetRidgeModel,
 )
 from come_a_little_bit_closer.evaluation.probes import (
     angular_errors,
@@ -38,9 +42,11 @@ from come_a_little_bit_closer.evaluation.probes import (
     bootstrap_interval,
     coordinate_centroid,
     country_predictions,
-    fit_ridge,
-    predict_ridge,
+    fit_ridge_path,
+    predict_targets,
+    r_squared,
     unit_predictions,
+    vectors_to_coordinates,
 )
 from come_a_little_bit_closer.evaluation.splits import (
     random_split,
@@ -48,7 +54,11 @@ from come_a_little_bit_closer.evaluation.splits import (
     split_indices,
 )
 from come_a_little_bit_closer.geometry.distances import spherical_vectors
-from come_a_little_bit_closer.geometry.schemas import Coordinates, ScoreVector
+from come_a_little_bit_closer.geometry.schemas import (
+    CoordinateMatrix,
+    Coordinates,
+    ScoreVector,
+)
 from come_a_little_bit_closer.models.layer_catalog import find_layer_model
 from come_a_little_bit_closer.models.layer_schemas import LayerFeatures
 
@@ -58,29 +68,114 @@ def evaluated_indices(manifest: SplitManifest, mode: EvaluationMode) -> IndexVec
 
 
 @jaxtyped(typechecker=beartype)
+def ridge_targets(
+    probe_target: ProbeTarget,
+    targets: ProbeTargets,
+    coordinates: CoordinateMatrix,
+    country_codes: list[str],
+    train: IndexVector,
+) -> RidgeTargets:
+    if probe_target == "latlon":
+        return coordinates
+    if probe_target == "country-residual":
+        return targets - country_predictions(targets, country_codes, train)
+    return targets
+
+
+@jaxtyped(typechecker=beartype)
+def decode_predictions(
+    raw: RidgeTargets,
+    probe_target: ProbeTarget,
+    centroids: ProbeTargets,
+    fallback: ScoreVector,
+) -> ProbeTargets:
+    if probe_target == "latlon":
+        return spherical_vectors(
+            np.column_stack(
+                (
+                    np.clip(raw[:, 0], -90.0, 90.0),
+                    (raw[:, 1] + 180.0) % 360.0 - 180.0,
+                )
+            )
+        )
+    if probe_target == "country-residual":
+        return unit_predictions(centroids + raw, fallback)
+    return unit_predictions(raw, fallback)
+
+
+@jaxtyped(typechecker=beartype)
 def fit_layer_probe(
     features: ProbeFeatures,
     targets: ProbeTargets,
+    coordinates: CoordinateMatrix,
+    country_codes: list[str],
     manifest: SplitManifest,
     plan: LayerPlan,
     control: LayerControl,
-) -> RidgeModel:
+    probe_target: ProbeTarget,
+) -> TargetRidgeModel:
     """Fits on train and selects alpha on validation without reading other rows."""
+    if control == "permuted-labels" and probe_target != "sphere":
+        raise ValueError("Permuted-labels controls run for the sphere target only.")
     train = split_indices(manifest, "train")
     validation = split_indices(manifest, "validation")
     fitting_rows = np.concatenate([train, validation])
-    fitting_targets = targets[fitting_rows]
+    design = ridge_targets(probe_target, targets, coordinates, country_codes, train)
+    fitting_targets = design[fitting_rows]
     if control == "permuted-labels":
-        fitting_targets[: len(train)] = targets[
+        fitting_targets[: len(train)] = design[
             np.random.default_rng(manifest.seed).permutation(train)
         ]
-    return fit_ridge(
+    centroids = country_predictions(targets, country_codes, train)
+    return fit_ridge_path(
         features[fitting_rows],
         fitting_targets,
+        targets[fitting_rows],
         np.arange(len(train), dtype=np.int64),
         np.arange(len(train), len(fitting_rows), dtype=np.int64),
         [manifest.assignments[int(row)].block_id for row in fitting_rows],
+        partial(
+            decode_predictions,
+            probe_target=probe_target,
+            centroids=centroids[validation],
+            fallback=coordinate_centroid(targets[train]),
+        ),
         plan,
+    )
+
+
+@jaxtyped(typechecker=beartype)
+def layer_predictions(
+    features: ProbeFeatures,
+    targets: ProbeTargets,
+    coordinates: CoordinateMatrix,
+    country_codes: list[str],
+    manifest: SplitManifest,
+    plan: LayerPlan,
+    rows: IndexVector,
+    control: LayerControl,
+    probe_target: ProbeTarget,
+) -> tuple[SubsetTargets, float]:
+    train = split_indices(manifest, "train")
+    model = fit_layer_probe(
+        features,
+        targets,
+        coordinates,
+        country_codes,
+        manifest,
+        plan,
+        control,
+        probe_target,
+    )
+    centroids = country_predictions(targets, country_codes, train)
+    return (
+        decode_predictions(
+            predict_targets(model, features[rows]),
+            probe_target,
+            centroids[rows],
+            coordinate_centroid(targets[train]),
+        ),
+        model.alpha,
     )
 
 
@@ -91,11 +186,14 @@ def summarize(
     blocks: list[str],
     plan: LayerPlan,
     selected_alpha: float | None,
+    predictions: SubsetTargets,
+    true_coordinates: CoordinateMatrix,
 ) -> LayerScoreValues:
     means = block_means(errors, blocks)
     gains = block_means(country_errors - errors, blocks)
     low, high = bootstrap_interval(means, plan)
     gain_low, gain_high = bootstrap_interval(gains, plan)
+    predicted_coordinates = vectors_to_coordinates(predictions)
     return LayerScoreValues(
         selected_alpha=selected_alpha,
         evaluated_items=len(errors),
@@ -106,7 +204,21 @@ def summarize(
         gain_over_country_km=float(gains.mean()),
         gain_ci_low=gain_low,
         gain_ci_high=gain_high,
+        r2_latitude=r_squared(predicted_coordinates[:, 0], true_coordinates[:, 0]),
+        r2_longitude=r_squared(predicted_coordinates[:, 1], true_coordinates[:, 1]),
     )
+
+
+@jaxtyped(typechecker=beartype)
+def country_control_predictions(
+    targets: ProbeTargets,
+    country_codes: list[str],
+    manifest: SplitManifest,
+    mode: EvaluationMode,
+) -> SubsetTargets:
+    return country_predictions(
+        targets, country_codes, split_indices(manifest, "train")
+    )[evaluated_indices(manifest, mode)]
 
 
 @jaxtyped(typechecker=beartype)
@@ -117,12 +229,10 @@ def country_control_errors(
     plan: LayerPlan,
     mode: EvaluationMode,
 ) -> ScoreVector:
-    evaluated = evaluated_indices(manifest, mode)
-    predictions = country_predictions(
-        targets, country_codes, split_indices(manifest, "train")
-    )
     return angular_errors(
-        predictions[evaluated], targets[evaluated], plan.geometry.earth_radius_km
+        country_control_predictions(targets, country_codes, manifest, mode),
+        targets[evaluated_indices(manifest, mode)],
+        plan.geometry.earth_radius_km,
     )
 
 
@@ -130,18 +240,25 @@ def country_control_errors(
 def score_layer(
     features: ProbeFeatures,
     targets: ProbeTargets,
+    coordinates: CoordinateMatrix,
     country_codes: list[str],
     manifest: SplitManifest,
     plan: LayerPlan,
     mode: EvaluationMode,
     control: LayerControl,
+    probe_target: ProbeTarget,
 ) -> LayerScoreValues:
-    train = split_indices(manifest, "train")
     evaluated = evaluated_indices(manifest, mode)
-    model = fit_layer_probe(features, targets, manifest, plan, control)
-    predictions = unit_predictions(
-        predict_ridge(model, features[evaluated]),
-        coordinate_centroid(targets[train]),
+    predictions, alpha = layer_predictions(
+        features,
+        targets,
+        coordinates,
+        country_codes,
+        manifest,
+        plan,
+        evaluated,
+        control,
+        probe_target,
     )
     errors = angular_errors(
         predictions, targets[evaluated], plan.geometry.earth_radius_km
@@ -151,26 +268,34 @@ def score_layer(
         country_control_errors(targets, country_codes, manifest, plan, mode),
         [manifest.assignments[int(row)].block_id for row in evaluated],
         plan,
-        model.alpha,
+        alpha,
+        predictions,
+        coordinates[evaluated],
     )
 
 
 @jaxtyped(typechecker=beartype)
 def score_country_control(
     targets: ProbeTargets,
+    coordinates: CoordinateMatrix,
     country_codes: list[str],
     manifest: SplitManifest,
     plan: LayerPlan,
     mode: EvaluationMode,
 ) -> LayerScoreValues:
-    errors = country_control_errors(targets, country_codes, manifest, plan, mode)
     evaluated = evaluated_indices(manifest, mode)
+    predictions = country_control_predictions(targets, country_codes, manifest, mode)
+    errors = angular_errors(
+        predictions, targets[evaluated], plan.geometry.earth_radius_km
+    )
     return summarize(
         errors,
         errors,
         [manifest.assignments[int(row)].block_id for row in evaluated],
         plan,
         None,
+        predictions,
+        coordinates[evaluated],
     )
 
 
@@ -288,7 +413,7 @@ def write_rows(path: Path, rows: list[LayerProbeScore]) -> None:
 
 
 def split_record(manifest: SplitManifest) -> bytes:
-    return manifest.model_dump_json(indent=2).encode()
+    return manifest.model_dump_json(indent=2).encode() + b"\n"
 
 
 def split_path(
@@ -324,7 +449,6 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
     expected_cells = (
         validate_final_cells(plan, model_id, poolings) if mode == "final" else set()
     )
-    controls: list[LayerControl] = ["probe", "permuted-labels"]
     checksum = plan_checksum(config_path)
     rows: list[LayerProbeScore] = []
     split_records: dict[Path, SplitManifest] = {}
@@ -333,12 +457,11 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
             condition: dataset_items(dataset, condition) for condition in conditions
         }
         reference = items_by_condition[conditions[0]]
-        targets = spherical_vectors(
-            np.asarray(
-                [[place.latitude, place.longitude] for place in reference.coordinates],
-                dtype=np.float64,
-            )
+        coordinates = np.asarray(
+            [[place.latitude, place.longitude] for place in reference.coordinates],
+            dtype=np.float64,
         )
+        targets = spherical_vectors(coordinates)
         manifests = {
             (kind, seed): build_split(
                 kind,
@@ -404,6 +527,7 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
                                 control="country-centroid",
                                 **score_country_control(
                                     targets,
+                                    coordinates,
                                     reference.country_codes,
                                     manifest,
                                     plan,
@@ -414,28 +538,37 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
                 for layer in layers:
                     layer_features = np.asarray(features[layer], dtype=np.float64)
                     for (kind, seed), manifest in manifests.items():
-                        for control in controls:
-                            rows.append(
-                                LayerProbeScore(
-                                    **identity.model_dump(),
-                                    pooling=pooling,
-                                    layer=layer,
-                                    relative_depth=layer
-                                    / (feature_manifest.layers - 1),
-                                    split_kind=kind,
-                                    seed=seed,
-                                    control=control,
-                                    **score_layer(
-                                        layer_features,
-                                        targets,
-                                        reference.country_codes,
-                                        manifest,
-                                        plan,
-                                        mode,
-                                        control,
-                                    ).model_dump(),
-                                )
+                        for probe_target in plan.probe_targets:
+                            controls: list[LayerControl] = (
+                                ["probe", "permuted-labels"]
+                                if probe_target == "sphere"
+                                else ["probe"]
                             )
+                            for control in controls:
+                                rows.append(
+                                    LayerProbeScore(
+                                        **identity.model_dump(),
+                                        pooling=pooling,
+                                        layer=layer,
+                                        relative_depth=layer
+                                        / (feature_manifest.layers - 1),
+                                        split_kind=kind,
+                                        seed=seed,
+                                        control=control,
+                                        probe_target=probe_target,
+                                        **score_layer(
+                                            layer_features,
+                                            targets,
+                                            coordinates,
+                                            reference.country_codes,
+                                            manifest,
+                                            plan,
+                                            mode,
+                                            control,
+                                            probe_target,
+                                        ).model_dump(),
+                                    )
+                                )
                     print(
                         f"Scored {model_id} {dataset} {condition} {pooling} {layer}",
                         flush=True,
@@ -450,7 +583,7 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
             raise ValueError("Scored cells differ from the frozen final cells.")
     write_atomic(plan.output_directory / mode / f"{model_id}.plan.json", plan_bytes)
     for path, manifest in split_records.items():
-        write_atomic(path, split_record(manifest) + b"\n")
+        write_atomic(path, split_record(manifest))
     write_rows(output_path, rows)
     return output_path
 

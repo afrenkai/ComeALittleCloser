@@ -15,7 +15,7 @@ from matplotlib.layout_engine import ConstrainedLayoutEngine
 from come_a_little_bit_closer.evaluation.layer_extract import dataset_items
 from come_a_little_bit_closer.evaluation.layer_run import (
     build_split,
-    fit_layer_probe,
+    layer_predictions,
     load_features,
 )
 from come_a_little_bit_closer.evaluation.layer_schemas import (
@@ -24,26 +24,23 @@ from come_a_little_bit_closer.evaluation.layer_schemas import (
     LayerDataset,
     LayerPlan,
     LayerProbeScore,
+    ProbeTarget,
+    ScoreControl,
     ScoreSelection,
     SeedMeanScore,
+    SeedRange,
     SplitKind,
     StagePalette,
     TextCondition,
 )
 from come_a_little_bit_closer.evaluation.location_prepare import plan_checksum
-from come_a_little_bit_closer.evaluation.location_schemas import ProbeTargets
 from come_a_little_bit_closer.evaluation.probes import (
     angular_errors,
-    coordinate_centroid,
-    predict_ridge,
-    unit_predictions,
+    vectors_to_coordinates,
 )
 from come_a_little_bit_closer.evaluation.splits import split_indices
 from come_a_little_bit_closer.geometry.distances import spherical_vectors
-from come_a_little_bit_closer.geometry.schemas import (
-    CoordinateMatrix,
-    ScoreVector,
-)
+from come_a_little_bit_closer.geometry.schemas import ScoreVector
 from come_a_little_bit_closer.models.layer_catalog import find_layer_model
 
 
@@ -58,6 +55,13 @@ def load_scores(plan: LayerPlan, mode: EvaluationMode) -> list[LayerProbeScore]:
     return rows
 
 
+def seed_range(values: list[float | None]) -> SeedRange | None:
+    present = [value for value in values if value is not None]
+    if not present:
+        return None
+    return SeedRange(mean=float(np.mean(present)), low=min(present), high=max(present))
+
+
 def seed_means(
     rows: list[LayerProbeScore], selection: ScoreSelection
 ) -> list[SeedMeanScore]:
@@ -68,6 +72,7 @@ def seed_means(
             and row.condition == selection.condition
             and row.split_kind == selection.split_kind
             and row.control == selection.control
+            and row.probe_target == selection.probe_target
             and (selection.pooling is None or row.pooling == selection.pooling)
         ):
             groups.setdefault((row.model_id, row.pooling, row.layer), []).append(row)
@@ -86,6 +91,8 @@ def seed_means(
             ),
             gain_ci_low=float(np.mean([row.gain_ci_low for row in members])),
             gain_ci_high=float(np.mean([row.gain_ci_high for row in members])),
+            r2_latitude=seed_range([row.r2_latitude for row in members]),
+            r2_longitude=seed_range([row.r2_longitude for row in members]),
             seeds=len(members),
         )
         for members in groups.values()
@@ -176,6 +183,7 @@ def draw_depth_curves(
     split_kind: SplitKind,
     palette: StagePalette,
     path: Path,
+    probe_target: ProbeTarget = "sphere",
 ) -> None:
     selection = ScoreSelection(
         dataset="cities",
@@ -183,8 +191,13 @@ def draw_depth_curves(
         split_kind=split_kind,
         control="probe",
         pooling="mean",
+        probe_target=probe_target,
     )
     means = seed_means(rows, selection)
+    heading = {
+        "sphere": "probe gain over the country centroid",
+        "country-residual": "residual-probe gain over the country centroid",
+    }
     questions = {
         "spatial-block": "unseen 10-degree regions",
         "random-item": "random held-out cities",
@@ -194,10 +207,15 @@ def draw_depth_curves(
     figure = titled_figure(
         6.2 * columns,
         4.4 * grid_rows + 1.1,
-        "Where geography dies: probe gain over the country centroid by depth "
+        f"Where geography dies: {heading[probe_target]} by depth "
         f"(validation, dev; {split_kind} split)",
         f"Cities, name-country text, mean pooling; {questions[split_kind]}. "
-        "Positive = better than knowing the country. Lines are seed means; bands "
+        + (
+            "The probe predicts the offset from the training-only country " "centroid. "
+            if probe_target == "country-residual"
+            else ""
+        )
+        + "Positive = better than knowing the country. Lines are seed means; bands "
         "are seed-mean 95% block-bootstrap CIs.",
     )
     panels = figure.subplots(
@@ -244,6 +262,84 @@ def draw_depth_curves(
         axes.set_ylabel("Gain over country centroid (km)")
     for axes in panels[-columns:]:
         axes.set_xlabel("Relative depth (layer / last layer)")
+    figure.savefig(path, dpi=200)
+
+
+def draw_r2_curves(
+    rows: list[LayerProbeScore],
+    families: list[str],
+    palette: StagePalette,
+    path: Path,
+) -> None:
+    selection = ScoreSelection(
+        dataset="cities",
+        condition="name-country",
+        split_kind="random-item",
+        control="probe",
+        pooling="mean",
+        probe_target="latlon",
+    )
+    means = seed_means(rows, selection)
+    figure = titled_figure(
+        4.6 * len(families),
+        8.2,
+        "Linear probe R-squared by depth, comparable to Gurnee & Tegmark's R-squared "
+        "(ridge onto lat/lon; validation, dev)",
+        "Cities, name-country text, mean pooling, random-item split. Ridge probe "
+        "onto [latitude, longitude] in degrees; R-squared = 1 - SSE/SST on "
+        "validation cities. Longitude R-squared uses raw degrees and ignores "
+        "wraparound. Lines are seed means; bands are the min-max across seeds.",
+    )
+    panels = figure.subplots(2, len(families), sharey="row", sharex=True, squeeze=False)
+    for column, family in enumerate(families):
+        family_means = sorted(
+            (score for score in means if score.family == family),
+            key=lambda score: (score.stage_order, score.layer or 0),
+        )
+        for row_index, axis_name in enumerate(["Latitude", "Longitude"]):
+            axes = panels[row_index, column]
+            if row_index == 0:
+                axes.set_title(family, loc="left", fontweight="bold")
+            for stage_order, model_id in sorted_stage_models(rows, family):
+                curve = [score for score in family_means if score.model_id == model_id]
+                ranges = [
+                    score.r2_latitude if row_index == 0 else score.r2_longitude
+                    for score in curve
+                ]
+                if not curve or any(value is None for value in ranges):
+                    continue
+                color = stage_color(curve[0].stage, palette)
+                depth = np.asarray(
+                    [score.relative_depth for score in curve], dtype=float
+                )
+                axes.fill_between(
+                    depth,
+                    [value.low for value in ranges if value is not None],
+                    [value.high for value in ranges if value is not None],
+                    color=color,
+                    alpha=0.15,
+                    linewidth=0,
+                )
+                axes.plot(
+                    depth,
+                    [value.mean for value in ranges if value is not None],
+                    color=color,
+                    linewidth=1.8,
+                    linestyle="--" if stage_order == 0 else "-",
+                    label=stage_label(curve[0], palette),
+                )
+            axes.grid(axis="y", color="#dddddd", linewidth=0.6)
+            axes.set_xlim(0, 1)
+            if column == 0:
+                axes.set_ylabel(f"{axis_name} R-squared")
+            if row_index == 1:
+                axes.set_xlabel("Relative depth (layer / last layer)")
+                axes.legend(
+                    loc="upper center",
+                    bbox_to_anchor=(0.5, -0.25),
+                    frameon=False,
+                    ncols=1,
+                )
     figure.savefig(path, dpi=200)
 
 
@@ -332,16 +428,6 @@ def draw_trajectory(
 
 
 @jaxtyped(typechecker=beartype)
-def vectors_to_coordinates(vectors: ProbeTargets) -> CoordinateMatrix:
-    return np.column_stack(
-        (
-            np.degrees(np.arcsin(np.clip(vectors[:, 2], -1.0, 1.0))),
-            np.degrees(np.arctan2(vectors[:, 1], vectors[:, 0])),
-        )
-    )
-
-
-@jaxtyped(typechecker=beartype)
 def unwrapped_longitudes(
     true_longitudes: ScoreVector, predicted_longitudes: ScoreVector
 ) -> ScoreVector:
@@ -358,12 +444,11 @@ def distortion_panel(
     if score.pooling is None or score.layer is None:
         raise ValueError("Distortion maps need a fitted layer.")
     items = dataset_items(dataset, condition)
-    targets = spherical_vectors(
-        np.asarray(
-            [[place.latitude, place.longitude] for place in items.coordinates],
-            dtype=np.float64,
-        )
+    coordinates = np.asarray(
+        [[place.latitude, place.longitude] for place in items.coordinates],
+        dtype=np.float64,
     )
+    targets = spherical_vectors(coordinates)
     manifest = build_split(
         "random-item",
         items.item_ids,
@@ -385,13 +470,18 @@ def distortion_panel(
     if score.layer >= feature_manifest.layers:
         raise ValueError("Scored layer is outside the extracted layers.")
     layer_features = np.asarray(features[score.layer], dtype=np.float64)
-    train = split_indices(manifest, "train")
     validation = split_indices(manifest, "validation")
-    model = fit_layer_probe(layer_features, targets, manifest, plan, "probe")
-    predictions = unit_predictions(
-        predict_ridge(model, layer_features[validation]),
-        coordinate_centroid(targets[train]),
-    )
+    predictions = layer_predictions(
+        layer_features,
+        targets,
+        coordinates,
+        items.country_codes,
+        manifest,
+        plan,
+        validation,
+        "probe",
+        "sphere",
+    )[0]
     return DistortionPanel(
         score=score,
         true_coordinates=vectors_to_coordinates(targets[validation]),
@@ -475,6 +565,112 @@ def draw_distortion(
 
 def km_or_na(score: SeedMeanScore | None) -> str:
     return "n/a" if score is None else f"{score.block_mean_km:,.0f}"
+
+
+def best_by_r2(means: list[SeedMeanScore]) -> dict[str, SeedMeanScore]:
+    best: dict[str, SeedMeanScore] = {}
+    for score in means:
+        if score.r2_latitude is None or score.r2_longitude is None:
+            continue
+        incumbent = best.get(score.model_id)
+        if incumbent is None or r2_average(score) > r2_average(incumbent):
+            best[score.model_id] = score
+    return best
+
+
+def r2_average(score: SeedMeanScore) -> float:
+    if score.r2_latitude is None or score.r2_longitude is None:
+        raise ValueError("Score carries no R-squared values.")
+    return (score.r2_latitude.mean + score.r2_longitude.mean) / 2
+
+
+def selected_means(
+    rows: list[LayerProbeScore],
+    dataset: LayerDataset,
+    condition: TextCondition,
+    split_kind: SplitKind,
+    control: ScoreControl,
+    probe_target: ProbeTarget,
+) -> list[SeedMeanScore]:
+    return seed_means(
+        rows,
+        ScoreSelection(
+            dataset=dataset,
+            condition=condition,
+            split_kind=split_kind,
+            control=control,
+            probe_target=probe_target,
+        ),
+    )
+
+
+def credibility_lines(rows: list[LayerProbeScore]) -> list[str]:
+    if not any(row.probe_target != "sphere" for row in rows):
+        return []
+    lines = [
+        "",
+        "## Probe credibility: country-residual gain and lat/lon R-squared "
+        "(validation, dev)",
+        "",
+        "All values are validation (dev) results, seed means, with the best layer "
+        "chosen on the same validation items (optimistic). Country-residual: the "
+        "probe predicts the offset from the training-only country centroid; gain "
+        "is over the country centroid (km), best layer by gain. Lat/lon R-squared "
+        "(ridge onto latitude and longitude in degrees, comparable to Gurnee & "
+        "Tegmark) is at the layer with the highest mean of the two R-squared "
+        "values. Longitude R-squared uses raw degrees and ignores wraparound. "
+        "Country-centroid R-squared is the reference: what knowing the country "
+        "alone explains.",
+        "",
+        "| model | dataset | condition | split | residual layer | residual gain "
+        "(km) [CI] | latlon layer | latlon R2 lat | latlon R2 lon | "
+        "country-centroid R2 lat | country-centroid R2 lon |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    cells = sorted({(row.dataset, row.condition, row.split_kind) for row in rows})
+    for dataset, condition, split_kind in cells:
+
+        residual = best_layers(
+            selected_means(
+                rows, dataset, condition, split_kind, "probe", "country-residual"
+            )
+        )
+        latlon = best_by_r2(
+            selected_means(rows, dataset, condition, split_kind, "probe", "latlon")
+        )
+        country = {
+            score.model_id: score
+            for score in selected_means(
+                rows, dataset, condition, split_kind, "country-centroid", "sphere"
+            )
+        }
+        for model_id in sorted(set(residual) | set(latlon)):
+            gain = residual.get(model_id)
+            fit = latlon.get(model_id)
+            baseline = country.get(model_id)
+            lines.append(
+                f"| {model_id} | {dataset} | {condition} | {split_kind} | "
+                + (
+                    f"{gain.layer} | {gain.gain_over_country_km:,.0f} "
+                    f"[{gain.gain_ci_low:,.0f}, {gain.gain_ci_high:,.0f}]"
+                    if gain
+                    else "n/a | n/a"
+                )
+                + " | "
+                + (
+                    f"{fit.layer} | {r2_text(fit.r2_latitude)} | "
+                    f"{r2_text(fit.r2_longitude)}"
+                    if fit
+                    else "n/a | n/a | n/a"
+                )
+                + f" | {r2_text(baseline.r2_latitude if baseline else None)} | "
+                f"{r2_text(baseline.r2_longitude if baseline else None)} |"
+            )
+    return lines
+
+
+def r2_text(value: SeedRange | None) -> str:
+    return "n/a" if value is None else f"{value.mean:.3f}"
 
 
 def summary_lines(rows: list[LayerProbeScore], plan: LayerPlan) -> list[str]:
@@ -562,7 +758,7 @@ def summary_lines(rows: list[LayerProbeScore], plan: LayerPlan) -> list[str]:
                 f"{km_or_na(control)} | "
                 f"{km_or_na(baseline)} |"
             )
-    return lines
+    return lines + credibility_lines(rows)
 
 
 def write_report(config_path: Path, mode: EvaluationMode) -> Path:
@@ -598,6 +794,21 @@ def write_report(config_path: Path, mode: EvaluationMode) -> Path:
             palette,
             directory / "where-geography-dies-random-item.png",
         )
+        if any(row.probe_target == "country-residual" for row in rows):
+            draw_depth_curves(
+                rows,
+                families,
+                "spatial-block",
+                palette,
+                directory / "where-geography-dies-residual.png",
+                "country-residual",
+            )
+        else:
+            print("Skipping where-geography-dies-residual.png: no residual rows.")
+        if any(row.probe_target == "latlon" for row in rows):
+            draw_r2_curves(rows, families, palette, directory / "r2-by-depth.png")
+        else:
+            print("Skipping r2-by-depth.png: no latlon rows.")
         selection = ScoreSelection(
             dataset="cities",
             condition="name-country",
