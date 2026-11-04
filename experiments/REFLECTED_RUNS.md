@@ -26,6 +26,8 @@ Scripts: `outputs/diagnostics/reflected.py`, `fix.py`, `knn_geo.py` (exploratory
 | 3312274 | `knn_geo.py`: nearest-neighbour geolocation vs the linear probe, random-item, three seeds | Completed | 2:21 |
 | 3312282 | `knn_geo.py --split spatial-block` | Completed | 2:19 |
 | 3312289, 3312297, 3312310 | `evaluation.layer_reflected --config experiments/reflected-v1-dev.json --mode dev` (the module; 26 cells, both splits, three seeds). 3312297 adds the true-distance ceiling; 3312310 adds the crossover interaction | Completed; `outputs/reflected-v1-dev/dev/report.md`. Reproduces the exploratory numbers | about 3:05 each |
+| 3312326 | `reflected_depth.py`: centred-cosine kNN gain at every layer, base vs retrieval (validation, three seeds) | Cancelled after start: layer-0 last-token states are identical across cities, so centring divided by zero. Guarded and resubmitted | |
+| 3312327 | `reflected_depth.py` (guarded) | Completed | 30:29 |
 
 ## Findings so far (validation, exploratory)
 
@@ -35,7 +37,7 @@ Scripts: `outputs/diagnostics/reflected.py`, `fix.py`, `knn_geo.py` (exploratory
 4. **There is headroom.** The best cosine reaches about one third of the oracle kNN gain (e5-mistral 0.24 of 0.74). Qwen3-8B-Embedding reaches 0.13 (18%).
 5. **Not an isotropy artefact.** Base-model embeddings are anisotropic, which could hide geography from raw cosine. Centring, or removing the top 5 principal components (fit on training cities), raises base-model kNN gain only modestly; Qwen3-8B base mean-pooled goes from 0.07 to 0.10. After centring, the retrieval model still beats its base in every 4B+ pair, pooling and seed, on both rho and kNN gain (intervals above 0). After all-but-the-top, the same holds at last-token pooling for Qwen3-4B, Qwen3-8B and Mistral. The exceptions are Gemma at last-token pooling (kNN gain about +0.01, intervals spanning 0; rho still above 0) and Qwen3-4B/8B at mean pooling (kNN gain above 0, but rho spans 0 on one or two seeds). e5-mistral (last token) stays +0.20 and Qwen3-8B +0.10.
 
-**Working interpretation:** retrieval training does not add within-country geographic knowledge (the probe gains are unchanged, H2), but it moves that knowledge into the directions cosine similarity uses. It does so partially: about one third of the oracle at best.
+**Working interpretation (revised by finding 12):** retrieval training does not add within-country geographic knowledge (the probe gains are unchanged, H2). Its output vectors reflect that knowledge in cosine similarity far more than the base model's output vectors do, but only partially: about one third of the oracle at best. At mean pooling this is mostly preservation, not creation; see finding 12.
 
 ## Cheap fixes (validation, seed 1729; `fix.py`)
 
@@ -78,3 +80,18 @@ Predict a validation city's position as the mean of its 10 most cosine-similar t
 9. Without the same-country restriction, nearest neighbours from base models are far worse than the country centroid (-700 to -1,900 km): their cosine neighbours are often in other countries. Retrieval models' unrestricted neighbours beat the centroid (+207 to +552 km).
 10. **The crossover is about interpolation.** On the spatial-block split, which holds out whole 10-degree blocks, the probe beats nearest neighbours for every model and seed. Retrieval models: probe 131-348 km vs nearest-neighbour 68-232. Neighbours can only point to places seen in training, while a linear map can extrapolate. The retrieval-model advantage in finding 7 holds for unseen cities inside known regions.
 11. **The crossover as an interaction** (module, paired by place). Compute retrieval minus base of (probe error - neighbour error). On random-item it is positive in all 24 runs (4 pairs × 2 poolings × 3 seeds), with the interval above 0 in 17. It is strongest for Qwen3-4B (6 of 6, +60 to +115 km) and Mistral last-token (3 of 3, +128 to +175 km). It is weakest for Mistral mean-pooled (0 of 3, +14 to +20 km). On spatial-block it is mostly not significant (3 of 24 above 0), consistent with finding 10.
+12. **Where the difference arises (depth profile; centred-cosine kNN gain; validation, mean of three seeds).**
+
+    | Pair | Pooling | Base: best layer / last layer | Retrieval: best layer / last layer |
+    | --- | --- | --- | --- |
+    | Qwen3-4B | mean | 0.094 (L32) / 0.064 | 0.106 (L36) / 0.106 |
+    | Qwen3-4B | last | 0.038 (L20) / 0.024 | 0.118 (L32) / 0.113 |
+    | Qwen3-8B | mean | 0.131 (L32) / 0.084 | 0.145 (L36) / 0.145 |
+    | Qwen3-8B | last | 0.050 (L23) / 0.030 | 0.161 (L32) / 0.141 |
+    | Mistral | mean | 0.194 (L27) / 0.130 | 0.219 (L26) / 0.147 |
+    | Mistral | last | 0.061 (L12) / 0.044 | 0.308 (L26) / 0.259 |
+    | Gemma | mean | 0.240 (L38) / 0.177 | 0.234 (L35) / 0.216 |
+    | Gemma | last | 0.181 (L41) / 0.177 | 0.245 (L32) / 0.217 |
+    | XLM-R large to BGE-M3 | mean | 0.048 (L7) / 0.034 | 0.046 (L14) / 0.041 |
+
+    With mean pooling, base models' best intermediate layers already reflect within-country geography in cosine about as well as the retrieval models do. Base models lose much of it in their last few layers (Qwen3-8B 0.131 to 0.084; Gemma 0.240 to 0.177), while retrieval models keep it to the output. With last-token pooling, the base model's last token barely reflects geography at any depth (except Gemma's final layers), while the retrieval model's last token does from mid-depth on. This fits embedding training turning the last token into a summary of the text. The comparison in findings 2 and 5 is between output (last-layer) vectors. "Retrieval training surfaces geography" is accurate for those, but at mean pooling the mechanism is mostly that retrieval training stops the final layers from discarding it.

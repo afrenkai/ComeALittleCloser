@@ -18,10 +18,12 @@ The analysis uses the test cities of the layers random-item and spatial-block sp
 
 | # | Claim | Supported if (test cities, random-item) | Validation status |
 | --- | --- | --- | --- |
-| R1 (primary) | Retrieval training makes cosine similarity reflect within-country geography | For each 4B+ pair (Qwen3-4B, Qwen3-8B, Mistral, Gemma), at both poolings, with raw and centred cosine: retrieval-minus-base kNN gain, paired by country, has a CI above 0 on all three seeds (48 intervals) | 48 of 48 |
+| R1 (primary) | Retrieval models' output vectors reflect within-country geography in cosine similarity more than their base models' output vectors | For each 4B+ pair (Qwen3-4B, Qwen3-8B, Mistral, Gemma), at both poolings, with raw and centred cosine: retrieval-minus-base kNN gain, paired by country, has a CI above 0 on all three seeds (48 intervals) | 48 of 48 |
 | R2 (descriptive) | It is partial | Report each retrieval model's cosine kNN gain against the true-distance ceiling | Best: e5-mistral 0.24-0.27 of 0.73-0.75 |
 | R3 (secondary) | Retrieval training shifts within-country geography from linearly decodable toward nearest-neighbour accessible | Crossover interaction, at both poolings: point estimate above 0 in all 24 runs, and CI above 0 in at least 12 of 24 | 24 of 24 positive; 17 of 24 CI above 0 |
 | R4 (descriptive) | Nearest neighbours cannot extrapolate | Spatial-block: report probe vs nearest-neighbour gains | Probe ahead in all runs |
+
+R1 compares last-layer vectors only. The depth profile (`REFLECTED_RUNS.md`, finding 12) shows that with mean pooling, base models' intermediate layers reflect geography about as well. The paper must therefore say "output vectors", not "retrieval training creates it". A depth claim is not proposed for the test; the depth profile stays validation-only and descriptive.
 
 The negative result on cheap fixes is reported as exploratory, not as a frozen claim. The city-trained probe fix on stations is dominated by a country-code baseline (`REFLECTED_RUNS.md`, finding 6). The stations were already used in that exploration.
 
