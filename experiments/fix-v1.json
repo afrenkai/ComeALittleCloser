@@ -1,0 +1,49 @@
+{
+  "experiment_id": "fix-v1",
+  "layers_plan": "experiments/layers-v7.json",
+  "models": [
+    {
+      "model_id": "e5-mistral",
+      "template": "Instruct: {instruction}\nQuery: {text}"
+    },
+    {
+      "model_id": "bge-multilingual-gemma2",
+      "template": "<instruct>{instruction}\n<query>{text}"
+    },
+    {
+      "model_id": "qwen3-8b-embedding",
+      "template": "Instruct: {instruction}\nQuery:{text}"
+    }
+  ],
+  "instruction": "Given the name of a place, retrieve places that are geographically closest to it",
+  "instructed_directory": "data/processed/instructed-v1",
+  "output_directory": "outputs/fix-v1",
+  "sts_files": {
+    "dev": "data/raw/stsbenchmark/validation.jsonl.gz",
+    "test": "data/raw/stsbenchmark/test.jsonl.gz"
+  },
+  "sts_sha256": {
+    "dev": "e2cf5a5881c37c44d5de5c5b390834585234acdab4e6e08071c474bf00157783",
+    "test": "524a75137d413dbfc40c3e84905f733714232647c3848521acb6bc375b834e1c"
+  },
+  "split_kinds": [
+    "random-item",
+    "spatial-block"
+  ],
+  "fusion_weight": 1.0,
+  "distance_weight": 0.1,
+  "country_weight": 0.1,
+  "oracle_weight": 0.2,
+  "probe_rank": 32,
+  "probe_steps": 3000,
+  "probe_batch": 2048,
+  "probe_positives": 10,
+  "probe_learning_rate": 0.001,
+  "probe_margin": 1.0,
+  "probe_seed": 0,
+  "layer_sample": 8000,
+  "minimum_cities": 30,
+  "neighbors": 10,
+  "batch_size": 16,
+  "max_length": 256
+}
