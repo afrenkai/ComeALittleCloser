@@ -4,7 +4,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from come_a_little_bit_closer.evaluation.location_schemas import ProbeSettings
+from come_a_little_bit_closer.evaluation.location_schemas import (
+    IndexVector,
+    ProbeSettings,
+)
 from come_a_little_bit_closer.geometry.schemas import (
     CoordinateMatrix,
     Coordinates,
@@ -49,6 +52,7 @@ class LayerPlan(ProbeSettings):
     feature_directory: Path
     output_directory: Path
     final_cells: list[FinalCell] = Field(default_factory=list)
+    prediction_cells: list[FinalCell] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def conditions_and_final_cells_are_consistent(self) -> "LayerPlan":
@@ -66,6 +70,15 @@ class LayerPlan(ProbeSettings):
         for cell in self.final_cells:
             if cell.condition not in self.datasets.get(cell.dataset, []):
                 raise ValueError(f"Final cell outside the plan: {cell}")
+        if len({cell.model_dump_json() for cell in self.prediction_cells}) != len(
+            self.prediction_cells
+        ):
+            raise ValueError("Prediction cells must be unique.")
+        for cell in self.prediction_cells:
+            if cell.model_id not in self.model_ids or cell.condition not in (
+                self.datasets.get(cell.dataset, [])
+            ):
+                raise ValueError(f"Prediction cell outside the plan: {cell}")
         return self
 
 
@@ -152,6 +165,35 @@ class ScoreSelection(BaseModel):
     control: ScoreControl
     pooling: Pooling | None = None
     probe_target: ProbeTarget = "sphere"
+
+
+class BlockScore(BaseModel):
+    block_id: str
+    items: int = Field(gt=0)
+    mean_km: float
+    country_mean_km: float
+
+
+class LayerBlockScores(RunIdentity):
+    pooling: Pooling
+    layer: int
+    split_kind: SplitKind
+    seed: int
+    control: LayerControl
+    probe_target: ProbeTarget
+    blocks: list[BlockScore]
+
+
+@dataclass(frozen=True)
+class PlaceErrors:
+    """Per-place outcomes of one fitted probe on the evaluated rows."""
+
+    rows: IndexVector
+    block_ids: list[str]
+    predicted_coordinates: CoordinateMatrix
+    country_coordinates: CoordinateMatrix
+    errors_km: ScoreVector
+    country_errors_km: ScoreVector
 
 
 class SeedRange(BaseModel):
