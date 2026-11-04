@@ -1,8 +1,8 @@
-# Progress report — 2026-11-03
+# Progress report — 2026-11-04
 
 A plain-language summary of where the project stands, for the team. Technical run logs live in [`experiments/LAYERS_RUNS.md`](../experiments/LAYERS_RUNS.md); this page explains what they mean.
 
-**Short version.** We built a pipeline that measures, layer by layer, how much geographic information is inside a language model, and ran it on 18 models. Larger decoder models know where a city lies *within its country*, not just which country it is in, and retrieval training (turning a base model into a search-embedding model) does **not** throw that information away. Encoder models (XLM-R, E5, BGE-M3) show almost none of it. All numbers so far are on the **validation** split; the held-out **test** split has not been touched yet (see "Before the test run" below).
+**Short version.** We built a pipeline that measures, layer by layer, how much geographic information is inside a language model, and ran it on 18 models. Larger decoder models know where a city lies *within its country*, not just which country it is in, and retrieval training (turning a base model into a search-embedding model) does **not** throw that information away. Encoder models (XLM-R, E5, BGE-M3, and the 3.5B XLM-R XL) show at most a small amount. On 2026-11-04 we ran the held-out **test** split once, on a list of layers and claims frozen beforehand; the main findings held (see "Test results" below).
 
 ## Where the code is
 
@@ -94,18 +94,29 @@ Full tables (every model, dataset, split, and probe) are in [`figures/layers-v4/
 
 ## Caveats
 
-- **Validation numbers are optimistic.** The best layer and ridge strength are chosen on the same validation places they are scored on. The test run fixes this.
+- **Validation numbers were optimistic in principle**, because layers were chosen on validation. The test run (above) shows the gains held up.
 - **The country-centroid baseline is weak on station spatial-block splits.** When a country's main region is held out, its training centroid can come from a few distant stations, so station spatial-block gains partly reflect fixing a broken baseline. `summary.md` reports coverage.
-- **Some Qwen3-4B-Embedding layers are unstable for the lat/lon probe.** In `r2-by-depth.png` a few middle layers dip sharply with large seed spread (no other model does this, including the Mistral and Gemma pairs). This needs checking before we report lat/lon R² by layer.
+- **Some Qwen3-4B-Embedding layers are unstable for the lat/lon probe.** Explained: one city ("Carcassonne, France") gets an abnormally large hidden state and wrecks R² for the seed that holds it out. Kilometre metrics are unaffected; R² is now also reported with predictions clipped to valid coordinates.
 - **Probes show the information is decodable, not that the model uses it** for retrieval.
 
 ## One plan for every result
 
 All 18 models were probed under one plan, `experiments/layers-v4.json`, so every number on this page traces to the same configuration. The 14 earlier models reproduce their layers-v3 outputs byte for byte; layers-v4 adds the Mistral-7B and Gemma-2-9B pairs (finished 2026-11-03).
 
-## Before the test run
+## Test results (2026-11-04)
 
-The test split can be used only once. Before running it, the team agrees on a short list of exactly which results the paper claims (model, dataset, text form, pooling, probe, layer), commits that list, and only then runs the test. A draft list will be circulated next.
+Before touching the test split, we froze which layers to score (best validation layer plus last layer per model: 169 cells, `experiments/layers-v7.json`) and wrote down six claims with pass criteria ([`docs/FREEZE.md`](FREEZE.md)). The test ran once. Full tables: [`experiments/LAYERS_V7_CLAIMS.md`](../experiments/LAYERS_V7_CLAIMS.md). A claim passes only if all three random seeds pass.
+
+| Claim | Result |
+|---|---|
+| H1: decoders from 4B up know within-country geography | **Passed.** Test gains over the country centre are 116–375 km, as large as on validation. |
+| H2: retrieval training keeps it | **Passed** in all four pairs. No pair clearly gains or loses. |
+| H3: encoders show none | **Failed, narrowly.** Near zero on random-item. On spatial-block, two encoders (BGE-M3-unsupervised, XLM-R XL) beat the baseline on one seed (20–35 km). The defensible claim is a gap in size: encoders at most 50 km, decoders at least 116 km. |
+| H4: the retrieval models' own search vector carries it | **Failed, narrowly.** Three of four decoder retrieval models pass. Qwen3-4B-Embedding passes on two of three seeds. |
+| H5: lat/lon R² mostly reflects knowing the country | Reported as planned. Every model's R² is below what the country centre alone gets (0.95 / 0.98), and untrained random models reach 0.74–0.79 / 0.83–0.87. |
+| H6: not just famous cities | **Passed.** Every 4B+ decoder beats the country centre even for the smallest fifth of cities. |
+
+Two more findings from validation, both recorded in the run log: a 3.5B encoder (XLM-R XL) behaves like the small encoders, so encoder size does not explain the gap; and the larger the city, the larger the gain (about 1.5–3 times more for the largest fifth).
 
 ## How we got here (2026-11-02 to 2026-11-03)
 
@@ -131,7 +142,7 @@ The one-page update is [`paper/update/TeamN.tex`](../paper/update/TeamN.tex) (PD
 
 | When | What | Owner |
 |---|---|---|
-| Nov 4–10 | Freeze the test list; run the held-out test once | Tian-hao Zhang |
+| Nov 4 | Freeze the test list; run the held-out test once (**done**) | Tian-hao Zhang |
 | Nov 4–10 | V2 skeleton on validation scores | Artem Frenk |
 | Nov 4–10 | Retrieval metrics code (Spearman ρ, overlap@10, excess km, random baseline) | Nathan Chen |
 | Nov 4–10 | V3 aggregation (per-block displacement, capital/country/continent pulls) | Kenta Ploch |
@@ -145,11 +156,16 @@ Fallback if V2 lags: static per-layer maps answer C1–C2.
 
 ## Beyond the course: is this publishable?
 
-Honest assessment as of 2026-11-03: not yet a main-venue paper; a careful workshop paper (e.g. BlackboxNLP) is realistic after the test run.
+Honest assessment as of 2026-11-04: a solid workshop paper (e.g. BlackboxNLP) now; a Findings-level paper depends on the retrieval experiments below.
 
-- **Solid:** within-country geography in every decoder from 4B up, replicated across three families; retrieval training keeps it in all five pairs; the R² critique with the random-init control.
-- **Weak spots a reviewer would hit:** probes show decodability, not use; validation numbers only; "encoders have none" is confounded with size (all encoders are 0.6B or smaller); cities are famous named entities, so some signal may be memorized facts.
-- **The strongest direction:** the retrieval vectors carry geography (probes beat the centroid by 311–459 km on cities), yet cosine retrieval is still ~3,700–4,100 km from the true nearest stations. Showing that gap per region (the decodable-vs-reflected analysis), and then testing a cheap fix (a small linear reweighting along the probe direction, close to the adapter in the proposal), would make a Findings-level paper if the fix works.
+- **Solid, and now confirmed on held-out test data:** within-country geography in every decoder from 4B up, replicated across three families. Retrieval training keeps it in all four 4B+ pairs, and it reaches small towns, not just famous cities. The R² critique holds, with the random-init control.
+- **Addressed since 2026-11-03:**
+  - Size: a 3.5B encoder behaves like the small ones.
+  - Fame: the signal holds for the smallest fifth of cities.
+  - Validation optimism: the test gains held.
+- **Still open:** probes show decodability, not use. Encoders are not exactly zero on spatial-block, so the claim is a gap in size, not "none". Encoders and decoders also differ in training objective and data, not just architecture.
+- **Related work to position against** (found 2026-11-04): Feuerstein et al. 2026 (arXiv 2609.05721) recover geography from output embeddings with a few-seed projection and suggest geographic ranking. Their method is the natural baseline for our fix, and our country control is the main difference. Srinivasagan & Georges 2026 (arXiv 2609.00454) add coordinates through training, a contrast. Jiang et al. 2026 (arXiv 2605.12714) compare embedders and base LLMs layer by layer, without geography.
+- **The strongest direction:** show that cosine search ignores the within-country signal per region (the decodable-vs-reflected analysis). Then test a cheap fix (reweighting along the probe direction) against Feuerstein et al.'s projection and against geocoding plus distance reranking, with a trade-off curve against genre precision.
 
 ## Reproducing
 
