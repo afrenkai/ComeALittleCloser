@@ -251,6 +251,7 @@ class StagePalette(BaseModel):
             "gemma2-9b",
             "xlmr-base",
             "xlmr-large",
+            "xlmr-xl",
         ]
     )
     arrow_sample: int = 1500
