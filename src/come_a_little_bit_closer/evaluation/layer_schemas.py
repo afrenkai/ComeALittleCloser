@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 from come_a_little_bit_closer.evaluation.location_schemas import (
     IndexVector,
     ProbeSettings,
+    SubsetRidgeTargets,
 )
 from come_a_little_bit_closer.geometry.schemas import (
     CoordinateMatrix,
@@ -191,6 +192,7 @@ class PlaceErrors:
     rows: IndexVector
     block_ids: list[str]
     predicted_coordinates: CoordinateMatrix
+    raw_outputs: SubsetRidgeTargets
     country_coordinates: CoordinateMatrix
     errors_km: ScoreVector
     country_errors_km: ScoreVector

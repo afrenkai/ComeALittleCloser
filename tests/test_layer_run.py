@@ -531,7 +531,7 @@ def test_dev_run_writes_block_scores_and_requested_predictions(
     arrays = np.load(predictions_directory / "cities-name-mean-1.npz")
     errors = arrays["random-item/1/sphere/errors_km"]
     assert len(errors) == len(arrays["random-item/1/sphere/rows"])
-    assert "random-item/1/latlon/predicted_coordinates" in arrays
+    assert arrays["random-item/1/latlon/raw_outputs"].shape == (len(errors), 2)
     assert arrays["item_ids"].shape == (200,)
 
 
