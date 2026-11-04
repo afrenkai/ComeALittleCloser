@@ -1,6 +1,6 @@
-# Test-run freeze list: DRAFT for review (2026-11-03)
+# Test-run freeze list (approved 2026-11-04)
 
-**Status: draft, not frozen.** Nothing here has been committed to a plan's `final_cells`, and the held-out test split has not been touched. Once approved, the cells below go into a new plan (`layers-v7.json`: `layers-v6.json` plus `final_cells`). That plan is committed and recorded in `experiments/LAYERS_RUNS.md`, and then `--mode final` runs once per model. After that, nothing on this list can change.
+**Status: approved by Tian-hao Zhang on 2026-11-04 with every recommendation below: cell rule as written, R² as option (c), `xlmr-xl` included, H4 pooling stated as a limitation, H6 added. Frozen in `experiments/layers-v7.json` (169 `final_cells`, SHA-256 `81c161719c1a6e0a37ee9b555356a7c53bec0b14b2e3e38c3c44ba6c1766d0e1`).** The held-out test split had not been touched when this was approved. Nothing on this list changes after the final run.
 
 ## Why freeze first
 
@@ -28,11 +28,11 @@ Each headline claim names its cell and a pass criterion before we see the test.
 | H3 | MLM encoders up to 3.5B show none, so the encoder result is not just size | encoders incl. `xlmr-xl`, same cells | Gain CI includes 0 or is under 20 km for XLM-R base/large/XL and their retrieval models. On validation XL already shows none (5.8 km, CIs span 0; layers-v6). If XL shows gain on test, the claim falls back to "encoders up to 0.56B" and size stays a confound |
 | H4 | The retrieval models' own output vector carries geography beyond the country | last layer, `sphere`, cities `name-country`, random-item; last-token pooling for decoder retrieval models | Gain over the country centroid has a CI above 0 |
 | H5 | Lat/lon R² mostly reflects knowing the country | best layer, `latlon`; country-centroid and random-init rows | Country-centroid R² and random-init R² reported beside each model's R² |
-| H6 (proposed, needs your approval) | The within-country signal is not limited to famous places | H1 cells, cities only; `evaluation.layer_popularity --mode final` | For every H1 model, the gain CI for the smallest population quintile is above 0. On validation this already holds for all eight 4B+ decoder models on both splits; the largest quintile gains about 1.5-3 times more (`experiments/LAYERS_RUNS.md`, layers-v5) |
+| H6 | The within-country signal is not limited to famous places | H1 cells, cities only; `evaluation.layer_popularity --mode final` | For every H1 model, the gain CI for the smallest population quintile is above 0. On validation this already holds for all eight 4B+ decoder models on both splits; the largest quintile gains about 1.5-3 times more (`experiments/LAYERS_RUNS.md`, layers-v5) |
 
 Everything else in the test output (other conditions, stations, other layers) is reported as secondary and labelled exploratory.
 
-## Decisions needed from you
+## Decisions (all approved as recommended)
 
 1. **The cell rule above:** best validation layer plus last layer, for all models. Alternative: fewer cells, headline models only. Fewer cells mean fewer comparisons but less coverage.
 2. **How R² is computed.** The raw-output R² that Gurnee & Tegmark use is fragile: in Qwen3-4B-Embedding one city ("Carcassonne, France", an activation outlier) sends R² from 0.84 to -0.14 (see `experiments/LAYERS_RUNS.md`, layers-v5). Options:

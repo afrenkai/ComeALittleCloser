@@ -268,3 +268,12 @@ Result (validation, `country-residual`, best layer by seed-mean gain; the CI ran
 | qwen3-4b-base | 4B | 74.4 km [0.2, 204.5] (layer 34) | 120.7 km [9.1, 315.5] (layer 35) |
 
 A 3.5B masked-language-model encoder shows no within-country gain, the same as the 0.56B encoders, while a 4B decoder does. On validation, size alone does not explain the encoder result. The claim to test is "MLM encoders up to 3.5B show none", not "small models show none". Qwen3-0.6B shows none either, so among decoders size still matters. Because every best layer is chosen on validation, these gains are optimistic; the test run decides.
+
+## layers-v7 (held-out test run)
+
+Plan: `experiments/layers-v7.json` (SHA-256 `81c161719c1a6e0a37ee9b555356a7c53bec0b14b2e3e38c3c44ba6c1766d0e1`), written to `outputs/layers-v7`. It is `layers-v6.json` with 169 `final_cells`, all other settings identical (models, splits, seeds, alphas, bootstrap, features). The cells are the approved freeze list in `docs/FREEZE.md`: per model, dataset, condition and pooling, the best validation layer (highest seed-mean `country-residual` gain, random-item, layers-v4/v6 dev) and the last layer. That gives 164 cells for the 18 layers-v5 models and 5 for `xlmr-xl`. All 169 were checked against the feature manifests before freezing. The claims and pass criteria (H1-H6) were fixed in `docs/FREEZE.md` before any test data was scored. `outputs/layers-v7` did not exist when the plan was committed.
+
+Final mode fits each probe on the training split, selects alpha on validation, and scores the test split once per model; the runner refuses a second run and a differing split file. Do not edit this plan; any change needs a new version and is reported as post hoc.
+
+| Job | Role | Outcome | Elapsed | Node |
+| --- | --- | --- | --- | --- |
