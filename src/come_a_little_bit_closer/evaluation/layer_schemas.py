@@ -248,6 +248,85 @@ class ClaimRoster(BaseModel):
     random_init_models: list[str] = ["qwen3-0.6b-random", "xlmr-base-random"]
 
 
+type ReflectedSimilarity = Literal["cosine", "centered-cosine", "probe-decoded"]
+
+
+class ReflectedCell(BaseModel):
+    model_id: str
+    pooling: Pooling
+
+
+class ReflectedPlan(BaseModel):
+    """Is within-country geography reflected in similarity? Cities, name-country."""
+
+    experiment_id: str
+    layers_plan: Path
+    cells: list[ReflectedCell]
+    pairs: list[tuple[str, str]]
+    minimum_cities: int = Field(default=30, gt=1)
+    neighbors: int = Field(default=10, gt=0)
+    output_directory: Path
+
+    @model_validator(mode="after")
+    def pairs_use_planned_cells(self) -> "ReflectedPlan":
+        planned = {cell.model_id for cell in self.cells}
+        for base_id, retrieval_id in self.pairs:
+            if not {base_id, retrieval_id} <= planned:
+                raise ValueError(f"Pair outside the plan: {base_id}, {retrieval_id}")
+        return self
+
+
+class CountryReflection(BaseModel):
+    country_code: str
+    cities: int = Field(gt=1)
+    rho: float
+    knn_gain: float
+
+
+class ReflectedGeography(BaseModel):
+    model_id: str
+    pooling: Pooling
+    layer: int
+    mode: EvaluationMode
+    seed: int
+    similarity: ReflectedSimilarity
+    rho: float
+    knn_gain: float
+    countries: list[CountryReflection]
+
+
+class NeighborGeolocation(BaseModel):
+    model_id: str
+    pooling: Pooling
+    layer: int
+    mode: EvaluationMode
+    split_kind: SplitKind
+    seed: int
+    neighbor_gain_km: float
+    neighbor_ci_low: float
+    neighbor_ci_high: float
+    probe_gain_km: float
+    probe_ci_low: float
+    probe_ci_high: float
+    difference_km: float
+    difference_ci_low: float
+    difference_ci_high: float
+
+
+class NeighborCrossover(BaseModel):
+    """Retrieval minus base of (probe error - neighbour error), paired by place."""
+
+    base_id: str
+    retrieval_id: str
+    pooling: Pooling
+    mode: EvaluationMode
+    split_kind: SplitKind
+    seed: int
+    interaction_km: float
+    ci_low: float
+    ci_high: float
+
+
 @dataclass(frozen=True)
 class PlaceErrors:
     """Per-place outcomes of one fitted probe on the evaluated rows."""

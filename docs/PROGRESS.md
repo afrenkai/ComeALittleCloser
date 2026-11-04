@@ -118,6 +118,17 @@ Before touching the test split, we froze which layers to score (best validation 
 
 Two more findings from validation, both recorded in the run log: a 3.5B encoder (XLM-R XL) behaves like the small encoders, so encoder size does not explain the gap; and the larger the city, the larger the gain (about 1.5–3 times more for the largest fifth).
 
+## New (exploratory, validation only): is the geography visible to cosine similarity?
+
+Started 2026-11-04 on branch `research/reflected-geography`; log in [`experiments/REFLECTED_RUNS.md`](../experiments/REFLECTED_RUNS.md). The question is whether a city's cosine nearest neighbours (what retrieval uses) are geographically close within its country, not only whether a probe can decode its position.
+
+- **Retrieval training moves geography into cosine similarity.** Base models hold within-country geography (probes decode it), but their cosine neighbours barely reflect it. After retrieval training, cosine neighbours are clearly closer. This holds in all four 4B+ pairs, both poolings and all three seeds, and survives centring the embeddings, so it is not an isotropy artefact. The largest change is Mistral to e5-mistral: neighbours go from 4% to 24% closer than random same-country cities.
+- **It is partial.** The best model gets about a third of the way to the true nearest neighbours.
+- **The linear probe understates retrieval models.** Within a country, predicting a city from its most similar training cities beats the probe for retrieval models and loses to it for base models. This does not hold when whole regions are held out.
+- **The planned "cheap fix" does not stand.** Adding the probe's position to the vector mainly corrects the country of a neighbour, and a trivial country-code baseline does that better.
+
+This changes the paper's angle. The earlier hypothesis was "geography is encoded but unused by cosine"; validation suggests instead that retrieval training surfaces it, partly. A freeze draft for testing this once on the held-out cities is in [`docs/REFLECTED_FREEZE_DRAFT.md`](REFLECTED_FREEZE_DRAFT.md) and needs approval.
+
 ## How we got here (2026-11-02 to 2026-11-03)
 
 Each step was a new frozen plan, so earlier results stay reproducible; details and job IDs are in [`experiments/LAYERS_RUNS.md`](../experiments/LAYERS_RUNS.md).
