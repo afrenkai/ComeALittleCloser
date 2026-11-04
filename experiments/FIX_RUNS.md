@@ -143,3 +143,12 @@ Remaining before claiming it:
 2. A semantic cost measured on data not used for choosing lambda, the weight, the layer or the instruction. The stations have been used for selection.
 3. A check that instructed documents do not hurt non-geographic queries in a realistic retrieval setting.
 4. Turning `fixes.py` into a tested module.
+
+## fix-v1: module, freeze and test run
+
+The fix is now `evaluation/geo_fix.py`, with instruction-conditioned extraction in `evaluation/instructed_extract.py`, schemas in `evaluation/fix_schemas.py`, tests in `tests/test_geo_fix.py` and GPU jobs via `ops/fix-extract.sbatch`. Claims and criteria were frozen in `docs/FIX_FREEZE.md` (commit `ed4a5bf`) before the module produced any number. The plans are `experiments/fix-v1-dev.json` (validation, layers-v5 splits) and `experiments/fix-v1.json` (test, layers-v7; SHA-256 `0e8267f599ae978bfec6a7c5d12df9d2b326ab139d233f9ca9563dd59cdd6ff2`). Their settings are identical. The semantic-cost set is STS-Benchmark (`data/raw/stsbenchmark`, dev 1,500 pairs and test 1,379 pairs, checksums in the plan).
+
+| Job | Role | Outcome | Elapsed |
+| --- | --- | --- | --- |
+| 3318253 (array 0-2) | Module extraction (instructed cities, stations, STS dev/test plain and instructed) for e5-mistral, bge-gemma2, qwen3-8b-embedding | Failed, all three. A guard refused instructed station texts over 256 tokens; the original layer pipeline truncates and records the count (stations: 10-47 truncated per model). Code fixed to record `truncated_items` in the manifest, matching the original pipeline, and to skip collections already extracted; plan unchanged. Partial city outputs were re-extracted | 10:49-12:07 |
+| 3318624 (array 0-2) | Module extraction, resubmitted | Running | |

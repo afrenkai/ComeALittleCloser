@@ -88,6 +88,27 @@ def read_instructed(
     return np.load(path, mmap_mode="r"), manifest
 
 
+def already_extracted(
+    path: Path,
+    plan: FixPlan,
+    collection: FixCollection,
+    instructed: bool,
+    model: InstructedModel,
+) -> bool:
+    manifest_path = path.with_suffix(".json")
+    if not path.exists() or not manifest_path.exists():
+        return False
+    manifest = InstructedManifest.model_validate_json(manifest_path.read_bytes())
+    item_ids, texts, source_sha256 = collection_texts(plan, collection)
+    return (
+        manifest.instruction == (plan.instruction if instructed else None)
+        and manifest.template == (model.template if instructed else "{text}")
+        and manifest.item_ids == item_ids
+        and manifest.source_sha256 == source_sha256
+        and manifest.max_length == plan.max_length
+    )
+
+
 def extract_instructed(
     plan: FixPlan, model: InstructedModel, device: str
 ) -> list[Path]:
@@ -114,8 +135,11 @@ def extract_instructed(
             if instructed
             else raw_texts
         )
-        if extractor.count_truncated(texts):
-            raise ValueError("Texts exceed the token limit.")
+        path = instructed_path(plan, model.model_id, collection, instructed)
+        if already_extracted(path, plan, collection, instructed, model):
+            print(f"Already extracted {model.model_id} {collection}", flush=True)
+            written.append(path)
+            continue
         features = extractor.extract(texts, plan.batch_size)["last"]
         layers = kept_layers(features.shape[0])
         manifest = InstructedManifest(
@@ -131,10 +155,10 @@ def extract_instructed(
             total_layers=features.shape[0],
             hidden=features.shape[2],
             max_length=plan.max_length,
+            truncated_items=extractor.count_truncated(texts),
             transformers_version=transformers.__version__,
             created_at=datetime.now(UTC).isoformat(),
         )
-        path = instructed_path(plan, model.model_id, collection, instructed)
         path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write(path, lambda handle: np.save(handle, features[layers]))
         atomic_write(

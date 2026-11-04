@@ -84,6 +84,7 @@ class InstructedManifest(BaseModel):
     total_layers: int
     hidden: int
     max_length: int
+    truncated_items: int
     transformers_version: str
     created_at: str
 
