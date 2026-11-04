@@ -156,3 +156,16 @@ The fix is now `evaluation/geo_fix.py`, with instruction-conditioned extraction 
 | 3322692 | Module dev run, resubmitted on `gtml` (L40S requested; CPU work) | Completed. Reproduces the exploration: e5-mistral full fix 0.360 / 0.357 city kNN (random-item / spatial-block) vs cosine 0.252 / 0.237; bge-gemma2 0.344 / 0.341 vs 0.204 / 0.213; qwen3-8b 0.246 / 0.216 vs 0.133 / 0.123. The paired CI is above 0 in all 18 runs. STS-B dev Spearman change of the full fix vs cosine: e5 +0.020 to +0.022, gemma +0.030 to +0.031, qwen -0.009 to -0.012. Genre change: e5 -0.005 to -0.001, gemma +0.010 to +0.016, qwen about -0.10. The plain cosine baseline is uninstructed, while e5 and bge are usually run with a task instruction, so part of the STS gain is likely any-instruction rather than geography. Report: `outputs/fix-v1-dev/dev/report.md` | 16:52-17:28 |
 | 3325419 | Check suite (ruff, black, pytest) at `69de7bd` | Completed, 74 passed | 0:28 |
 | 3325420 | **Final (test), run once**: `fix-v1.json` (SHA-256 verified `0e8267f5…cdd6ff2`), on `gtml`, `afterok:3325419`. `outputs/fix-v1` did not exist before submission | Completed. F1 supported (12/12, lowest CI bound +0.084); F2 supported (12/12, STS +0.013 to +0.028). Results: `experiments/FIX_V1_RESULTS.md` | 35:20 |
+
+## fix-baselines-v1: validation-only baselines and ablations (2026-11-04)
+
+These answer reviewer questions about fix-v1. Everything here is validation only: test cities and STS-B test are not read. `experiments/fix-generic-v1-dev.json` lists only the STS dev split, and extraction now encodes only the STS splits a plan lists. These are not frozen claims; the fix-v1 test is already used, so any new claim needs fresh held-out places.
+
+- **Similarity-instruction baseline.** Each model's standard STS instruction, "Retrieve semantically similar text.", on both sides (`experiments/fix-generic-v1-dev.json`, features in `data/processed/instructed-generic-v1`). This separates an any-instruction effect from the geographic wording. The exploration used a different control wording ("Given a text, retrieve semantically similar text").
+- **Factorial ablation.** Instruction × layer fusion × distance probe. "Probe" alone is the distance map on the final layer with no fusion.
+- **Feuerstein et al. (2026) axes.** Their Eq. 2, d = Σ(p₁ − p₂), on plain unit-norm output vectors (no centring, as in the paper). Latitude and longitude axes come from training cities. The paper uses K = 2 unspecified seed pairs, so we use every training city in a pair (upper half against lower half), which is at least as stable. There are two variants: global pairs, and pairs within each country. Scores are min-max mapped to the training coordinate range (their mapping) and turned into positions. They are used alone, and blended with cosine at w = 0.2 and 1.0 in the oracle's form.
+
+| Job | Role | Outcome | Elapsed |
+| --- | --- | --- | --- |
+| 3331578 (array 0-2) | Similarity-instruction extraction (cities, stations, STS dev plain and instructed) for e5-mistral, bge-gemma2, qwen3-8b-embedding; gtml L40S | Submitted | |
+| 3331775 | `fix_baselines --config experiments/fix-baselines-v1-dev.json`, on `gtml`, `afterok:3331578` | Submitted | |

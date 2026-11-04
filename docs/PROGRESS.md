@@ -13,10 +13,10 @@ The same day, two further analyses were frozen and tested once each:
 
 | Branch | What it holds | Status |
 |---|---|---|
-| `master` | Everything through the layer-probe test: explorer, location experiments, layer probes (PR #4) | default branch |
-| `research/fixes-and-results` | **Latest.** Reflected geography (frozen and tested), the coordinate-free fix (frozen and tested), the paper results section | pushed, to be merged into `master` |
+| `master` | Everything tested so far: explorer, location experiments, layer probes, reflected geography, the coordinate-free fix, the paper results section (PRs #4 and #5) | default branch |
+| `research/fix-baselines` | Validation-only baselines and ablations for the fix (similarity instruction, final-layer-only probe, Feuerstein et al. axes) | in progress |
 
-Older branches (`research/layer-probes`, `research/probe-credibility`, `research/per-place-predictions`, `research/reflected-geography`, `ops/bc-cluster`) are fully contained in these two.
+All older research branches were merged and deleted on 2026-11-04.
 
 ## The question
 
@@ -139,7 +139,7 @@ This changes the paper's angle. The earlier hypothesis was "geography is encoded
 
 ## A coordinate-free fix, tested (2026-11-04)
 
-Branch `research/fixes-and-results`; log in [`experiments/FIX_RUNS.md`](../experiments/FIX_RUNS.md). If retrieval models surface only part of the geography they hold, can cosine-style search be made to use more of it without giving the model coordinates? Exploration on validation found three cheap components that add up:
+Merged to `master` (PR #5); log in [`experiments/FIX_RUNS.md`](../experiments/FIX_RUNS.md). If retrieval models surface only part of the geography they hold, can cosine-style search be made to use more of it without giving the model coordinates? Exploration on validation found three cheap components that add up:
 
 1. a geography task instruction ("Given the name of a place, retrieve places that are geographically closest to it");
 2. adding the cosine of an intermediate layer;

@@ -116,13 +116,14 @@ def extract_instructed(
     if spec.architecture != "decoder":
         raise ValueError("Instructed extraction uses last-token pooling (decoders).")
     extractor = LayerExtractor(spec, device, plan.max_length)
+    sts_collections: dict[str, FixCollection] = {"dev": "sts-dev", "test": "sts-test"}
     jobs: list[tuple[FixCollection, bool]] = [
         ("cities-name-country", True),
         ("stations-metadata", True),
-        ("sts-dev", False),
-        ("sts-dev", True),
-        ("sts-test", False),
-        ("sts-test", True),
+    ] + [
+        (sts_collections[split], instructed)
+        for split in plan.sts_files
+        for instructed in [False, True]
     ]
     written = []
     for collection, instructed in jobs:

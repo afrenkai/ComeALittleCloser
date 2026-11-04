@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from come_a_little_bit_closer.evaluation.fix_baselines import feuerstein_axis
 from come_a_little_bit_closer.evaluation.fix_schemas import FixPlan
 from come_a_little_bit_closer.evaluation.geo_fix import (
     genre_agreement,
@@ -72,3 +73,24 @@ def test_genre_agreement_ignores_untagged_items() -> None:
     score = np.asarray([[0, 3, 1], [3, 0, 2], [1, 2, 0]], dtype=np.float32)
     genres = [{"rock"}, {"rock", "pop"}, set()]
     assert genre_agreement(score, genres, 1) == 1.0
+
+
+def test_feuerstein_country_axis_ignores_between_country_offset() -> None:
+    generator = np.random.default_rng(0)
+    latitude = np.concatenate(
+        [generator.uniform(0, 10, 200), generator.uniform(50, 60, 200)]
+    )
+    codes = np.asarray(["AA"] * 200 + ["BB"] * 200)
+    within = latitude - np.where(codes == "AA", 5, 55)
+    vectors = np.column_stack(
+        [
+            within,
+            np.where(codes == "BB", 40.0, 0.0),
+            generator.normal(size=(400, 20)),
+        ]
+    ).astype(np.float32)
+    southern = codes == "AA"
+    by_country = vectors @ feuerstein_axis(vectors, latitude, codes)
+    globally = vectors @ feuerstein_axis(vectors, latitude, np.zeros(400, dtype=int))
+    assert spearman(by_country[southern], latitude[southern]) > 0.9
+    assert spearman(globally[southern], latitude[southern]) < 0.5

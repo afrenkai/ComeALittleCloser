@@ -22,9 +22,17 @@ type FixMethod = Literal[
     "cosine",
     "country",
     "oracle",
+    "fusion",
+    "probe",
     "fusion-probe",
     "instruction",
+    "instruction-fusion",
+    "instruction-probe",
     "instruction-fusion-probe",
+    "generic-instruction",
+    "generic-instruction-fusion-probe",
+    "feuerstein-global",
+    "feuerstein-country",
 ]
 
 
@@ -105,6 +113,17 @@ class FixScore(BaseModel):
     genre_agreement: float
     sts_spearman: float | None
     city_countries: list[CountryReflection]
+    blend_weight: float | None = None
+
+
+class BaselinePlan(BaseModel):
+    """Validation-only baselines and ablations for the fix (no final mode)."""
+
+    experiment_id: str
+    fix_plan: Path
+    generic_plan: Path
+    output_directory: Path
+    feuerstein_weights: list[float] = [0.2, 1.0]
 
 
 @dataclass(frozen=True)
@@ -124,3 +143,26 @@ class FittedFix:
     layer_center: np.ndarray
     output_center: np.ndarray
     probe: np.ndarray
+
+
+@dataclass(frozen=True)
+class FixTargets:
+    """What every score matrix is judged against, for one split and seed."""
+
+    city_truth: np.ndarray
+    city_codes: np.ndarray
+    station_truth: np.ndarray
+    station_codes: np.ndarray
+    genres: list[set[str]]
+    sts: StsPairs
+
+
+@dataclass(frozen=True)
+class FeuersteinMap:
+    """Latitude and longitude axes from seed pairs, min-max mapped to coordinates."""
+
+    axes: np.ndarray
+    projection_low: np.ndarray
+    projection_high: np.ndarray
+    coordinate_low: np.ndarray
+    coordinate_high: np.ndarray
