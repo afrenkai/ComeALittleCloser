@@ -257,17 +257,17 @@ Purpose: every encoder in layers-v4 has at most 0.6B parameters and every decode
 | 3306616 | xlmr-xl extraction, batch 8, `short` GPU (after 3306604) | Completed | 6:56 | g016 |
 | 3306617 | xlmr-xl dev probe, gtml (after 3306616) | Completed; 2682 rows | 1:00:34 | grs002 |
 
-Result (validation, `country-residual`, best layer by seed-mean gain; the CI range spans the three seeds' block-bootstrap CIs):
+Result (validation, `country-residual`, cities `name-country`, mean pooling, best layer by seed-mean gain; the CI range spans the three seeds' block-bootstrap CIs). Corrected 2026-11-04: the first version of this table averaged mean and last-token pooling for the two Qwen rows, which understated Qwen3-4B (74 km). The frozen cells were unaffected; they were chosen per pooling.
 
 | Model | Params | cities name-country, random-item | cities name-country, spatial-block |
 | --- | --- | --- | --- |
 | xlmr-large | 0.56B | 1.2 km [-4.2, 11.1] (layer 3) | 8.2 km [-23.1, 57.0] (layer 15) |
 | bge-m3 | 0.56B | 10.6 km [-10.2, 36.3] (layer 16) | 21.4 km [-11.1, 81.4] (layer 18) |
 | xlmr-xl | 3.5B | 5.8 km [-8.1, 21.6] (layer 32) | 18.4 km [-13.4, 51.3] (layer 21) |
-| qwen3-0.6b-base | 0.6B | 7.1 km [-9.7, 38.5] (layer 24) | 31.4 km [-12.1, 159.4] (layer 28) |
-| qwen3-4b-base | 4B | 74.4 km [0.2, 204.5] (layer 34) | 120.7 km [9.1, 315.5] (layer 35) |
+| qwen3-0.6b-base | 0.6B | 11.8 km [-9.7, 38.5] (layer 24) | 47.5 km [0.2, 159.4] (layer 28) |
+| qwen3-4b-base | 4B | 119.6 km [61.8, 204.5] (layer 34) | 157.9 km [62.7, 315.5] (layer 35) |
 
-A 3.5B masked-language-model encoder shows no within-country gain, the same as the 0.56B encoders, while a 4B decoder does. On validation, size alone does not explain the encoder result. The claim to test is "MLM encoders up to 3.5B show none", not "small models show none". Qwen3-0.6B shows none either, so among decoders size still matters. Because every best layer is chosen on validation, these gains are optimistic; the test run decides.
+A 3.5B masked-language-model encoder shows no within-country gain, the same as the 0.56B encoders, while a 4B decoder does. On validation, size alone does not explain the encoder result. The claim to test is "MLM encoders up to 3.5B show none", not "small models show none". Qwen3-0.6B shows little (12 km on random-item, CI spanning 0; 48 km on spatial-block), so among decoders size still matters. Because every best layer is chosen on validation, these gains are optimistic; the test run decides.
 
 ## layers-v7 (held-out test run)
 
@@ -278,3 +278,7 @@ Final mode fits each probe on the training split, selects alpha on validation, a
 | Job | Role | Outcome | Elapsed | Node |
 | --- | --- | --- | --- | --- |
 | 3312021-3312039 | final (test) run, one job per model at `4a1ae04`, gtml `--gres=gpu:1` (qwen3-0.6b-base, qwen3-0.6b-embedding, qwen3-4b-base, qwen3-4b-embedding, qwen3-8b-base, qwen3-8b-embedding, mistral-7b-base, e5-mistral, gemma2-9b-base, bge-multilingual-gemma2, xlmr-base, e5-base, xlmr-large, bge-m3-retromae, bge-m3-unsupervised, bge-m3, qwen3-0.6b-random, xlmr-base-random, xlmr-xl, in job-ID order) | Submitted 2026-11-04 | | |
+| 3312049 | dry run of `evaluation.layer_claims` on validation outputs (fixture in login-node `/tmp`, not visible to compute nodes) | Cancelled | | |
+| 3312050, 3312166 | dry run of `evaluation.layer_claims` on validation outputs (layers-v5/v6 dev linked under the v7 cells; `outputs/diagnostics/claims-dry/`) | Completed; report runs end to end. 3312166 adds the both-splits H2 direction summary | 0:55 | |
+
+Validation dry run of the frozen scoring (no test data read). On validation, H1, H2 and H6 pass. H4 fails for qwen3-4b-embedding only (seed lower bounds -1, -55, -10 km). H3 fails for xlmr-base and e5-base on spatial-block (one seed each above 0 with gain over 20 km: 21 [1, 41] and 32 [5, 58]). Spatial-block holds out whole 10-degree blocks, so the training-only country centroid is biased for held-out regions and even weak probes can beat it. The frozen criteria are not changed; the test decides.

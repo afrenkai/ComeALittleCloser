@@ -204,6 +204,50 @@ class PopularityGain(PopularityCell):
     gain_ci_high: float
 
 
+class ClaimRoster(BaseModel):
+    """Models behind each frozen claim, as fixed in docs/FREEZE.md."""
+
+    h1_models: list[str] = [
+        "qwen3-4b-base",
+        "qwen3-4b-embedding",
+        "qwen3-8b-base",
+        "qwen3-8b-embedding",
+        "mistral-7b-base",
+        "e5-mistral",
+        "gemma2-9b-base",
+        "bge-multilingual-gemma2",
+    ]
+    h2_pairs: list[tuple[str, str]] = [
+        ("qwen3-4b-base", "qwen3-4b-embedding"),
+        ("qwen3-8b-base", "qwen3-8b-embedding"),
+        ("mistral-7b-base", "e5-mistral"),
+        ("gemma2-9b-base", "bge-multilingual-gemma2"),
+    ]
+    secondary_pairs: list[tuple[str, str]] = [
+        ("qwen3-0.6b-base", "qwen3-0.6b-embedding"),
+        ("xlmr-base", "e5-base"),
+        ("xlmr-large", "bge-m3"),
+    ]
+    h3_models: list[str] = [
+        "xlmr-base",
+        "e5-base",
+        "xlmr-large",
+        "bge-m3-retromae",
+        "bge-m3-unsupervised",
+        "bge-m3",
+        "xlmr-xl",
+    ]
+    h3_gain_floor_km: float = 20.0
+    h4_models: list[str] = [
+        "qwen3-4b-embedding",
+        "qwen3-8b-embedding",
+        "e5-mistral",
+        "bge-multilingual-gemma2",
+    ]
+    h4_secondary_models: list[str] = ["e5-base", "bge-m3"]
+    random_init_models: list[str] = ["qwen3-0.6b-random", "xlmr-base-random"]
+
+
 @dataclass(frozen=True)
 class PlaceErrors:
     """Per-place outcomes of one fitted probe on the evaluated rows."""
