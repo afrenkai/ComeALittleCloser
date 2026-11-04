@@ -128,7 +128,11 @@ Started 2026-11-04 on branch `research/reflected-geography`; log in [`experiment
 - **The linear probe understates retrieval models.** Within a country, predicting a city from its most similar training cities beats the probe for retrieval models and loses to it for base models. This does not hold when whole regions are held out.
 - **The planned "cheap fix" does not stand.** Adding the probe's position to the vector mainly corrects the country of a neighbour, and a trivial country-code baseline does that better.
 
-This changes the paper's angle. The earlier hypothesis was "geography is encoded but unused by cosine"; validation suggests instead that retrieval training surfaces it, partly. The team adopted this framing on 2026-11-04. The claims for a one-time test on the held-out cities are frozen in [`docs/REFLECTED_FREEZE.md`](REFLECTED_FREEZE.md).
+This changes the paper's angle. The earlier hypothesis was "geography is encoded but unused by cosine"; validation suggests instead that retrieval training surfaces it, partly. The team adopted this framing on 2026-11-04. The claims were frozen ([`docs/REFLECTED_FREEZE.md`](REFLECTED_FREEZE.md)) and tested once on the held-out cities ([`experiments/REFLECTED_V1_RESULTS.md`](../experiments/REFLECTED_V1_RESULTS.md)):
+
+- **The primary claim narrowly failed its strict rule.** 46 of 48 checks passed. All last-token and all Qwen comparisons pass. The two misses are mean-pooled Mistral and Gemma on one seed, with positive point estimates. The defensible statement: retrieval models' output vectors (last-token pooling, as they are used for search) reflect within-country geography more than their base models' in all four pairs; with mean pooling the difference is smaller.
+- **The best model reaches about a third of the ceiling** (e5-mistral: 0.25-0.27 vs 0.73-0.75).
+- **The shift from probe-decodable to neighbour-accessible held up and got stronger.** It is positive in all 24 runs and significant in 19 (validation: 17). It holds only within known regions, not for held-out regions.
 
 ## How we got here (2026-11-02 to 2026-11-03)
 
