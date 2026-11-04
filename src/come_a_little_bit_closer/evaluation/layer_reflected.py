@@ -124,6 +124,8 @@ def gain_interval(
 def run_reflected(config: Path, mode: EvaluationMode) -> Path:
     plan = ReflectedPlan.model_validate_json(config.read_bytes())
     layers = LayerPlan.model_validate_json(plan.layers_plan.read_bytes())
+    if mode == "final" and (plan.output_directory / mode / "reflected.jsonl").exists():
+        raise FileExistsError("Final reflected results already exist; final runs once.")
     items = dataset_items("cities", "name-country")
     truth = spherical_vectors(
         np.asarray([[point.latitude, point.longitude] for point in items.coordinates])
@@ -311,12 +313,12 @@ def country_value(country: CountryReflection, measure: Literal["rho", "knn"]) ->
     return country.rho if measure == "rho" else country.knn_gain
 
 
-def paired_text(
+def paired_interval(
     retrieval: ReflectedGeography,
     base: ReflectedGeography,
     layers: LayerPlan,
     measure: Literal["rho", "knn"],
-) -> str:
+) -> tuple[float, float, float]:
     base_values = {
         country.country_code: country_value(country, measure)
         for country in base.countries
@@ -329,7 +331,17 @@ def paired_text(
         ]
     )
     low, high = bootstrap_interval(differences, layers)
-    return f"{differences.mean():+.3f} [{low:+.3f}, {high:+.3f}]"
+    return float(differences.mean()), low, high
+
+
+def paired_text(
+    retrieval: ReflectedGeography,
+    base: ReflectedGeography,
+    layers: LayerPlan,
+    measure: Literal["rho", "knn"],
+) -> str:
+    mean, low, high = paired_interval(retrieval, base, layers, measure)
+    return f"{mean:+.3f} [{low:+.3f}, {high:+.3f}]"
 
 
 def reflected_report(
@@ -406,6 +418,28 @@ def reflected_report(
                         f" | {paired_text(retrieval, base, layers, 'rho')}"
                         f" | {paired_text(retrieval, base, layers, 'knn')} |"
                     )
+    if plan.primary_pairs:
+        lows = [
+            paired_interval(
+                index[(retrieval_id, pooling, seed, similarity)],
+                index[(base_id, pooling, seed, similarity)],
+                layers,
+                "knn",
+            )[1]
+            for base_id, retrieval_id in plan.primary_pairs
+            for pooling in ["mean", "last"]
+            if (base_id, pooling) in poolings and (retrieval_id, pooling) in poolings
+            for similarity in ["cosine", "centered-cosine"]
+            for seed in seeds
+        ]
+        above = sum(low > 0 for low in lows)
+        verdict = "supported" if above == len(lows) else "NOT supported"
+        lines += [
+            "",
+            f"**R1 (primary pairs, kNN gain, raw and centred cosine, both poolings,"
+            f" every seed): {above} of {len(lows)} paired intervals above 0;"
+            f" R1 {verdict}.**",
+        ]
     lines += [
         "",
         "## Nearest-neighbour geolocation vs the linear probe",

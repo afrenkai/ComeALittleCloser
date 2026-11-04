@@ -263,6 +263,7 @@ class ReflectedPlan(BaseModel):
     layers_plan: Path
     cells: list[ReflectedCell]
     pairs: list[tuple[str, str]]
+    primary_pairs: list[tuple[str, str]] = Field(default_factory=list)
     minimum_cities: int = Field(default=30, gt=1)
     neighbors: int = Field(default=10, gt=0)
     output_directory: Path
@@ -273,6 +274,8 @@ class ReflectedPlan(BaseModel):
         for base_id, retrieval_id in self.pairs:
             if not {base_id, retrieval_id} <= planned:
                 raise ValueError(f"Pair outside the plan: {base_id}, {retrieval_id}")
+        if not set(self.primary_pairs) <= set(self.pairs):
+            raise ValueError("Primary pairs must be among the plan's pairs.")
         return self
 
 

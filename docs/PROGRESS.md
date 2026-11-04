@@ -128,7 +128,7 @@ Started 2026-11-04 on branch `research/reflected-geography`; log in [`experiment
 - **The linear probe understates retrieval models.** Within a country, predicting a city from its most similar training cities beats the probe for retrieval models and loses to it for base models. This does not hold when whole regions are held out.
 - **The planned "cheap fix" does not stand.** Adding the probe's position to the vector mainly corrects the country of a neighbour, and a trivial country-code baseline does that better.
 
-This changes the paper's angle. The earlier hypothesis was "geography is encoded but unused by cosine"; validation suggests instead that retrieval training surfaces it, partly. A freeze draft for testing this once on the held-out cities is in [`docs/REFLECTED_FREEZE_DRAFT.md`](REFLECTED_FREEZE_DRAFT.md) and needs approval.
+This changes the paper's angle. The earlier hypothesis was "geography is encoded but unused by cosine"; validation suggests instead that retrieval training surfaces it, partly. The team adopted this framing on 2026-11-04. The claims for a one-time test on the held-out cities are frozen in [`docs/REFLECTED_FREEZE.md`](REFLECTED_FREEZE.md).
 
 ## How we got here (2026-11-02 to 2026-11-03)
 

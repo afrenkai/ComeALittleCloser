@@ -95,3 +95,10 @@ Predict a validation city's position as the mean of its 10 most cosine-similar t
     | XLM-R large to BGE-M3 | mean | 0.048 (L7) / 0.034 | 0.046 (L14) / 0.041 |
 
     With mean pooling, base models' best intermediate layers already reflect within-country geography in cosine about as well as the retrieval models do. Base models lose much of it in their last few layers (Qwen3-8B 0.131 to 0.084; Gemma 0.240 to 0.177), while retrieval models keep it to the output. With last-token pooling, the base model's last token barely reflects geography at any depth (except Gemma's final layers), while the retrieval model's last token does from mid-depth on. This fits embedding training turning the last token into a summary of the text. The comparison in findings 2 and 5 is between output (last-layer) vectors. "Retrieval training surfaces geography" is accurate for those, but at mean pooling the mechanism is mostly that retrieval training stops the final layers from discarding it.
+
+## reflected-v1 (held-out test cities, run once)
+
+Plan `experiments/reflected-v1.json` (SHA-256 `5ea323649c56e7c19ae54ef4fb1a6aa3b42c777e86160c81875be3077bbc5293`). It equals `reflected-v1-dev.json` with three changes: `layers_plan` is `experiments/layers-v7.json` (frozen test predictions and test rows), the output is `outputs/reflected-v1`, and it adds `xlmr-xl` and the four R1 `primary_pairs`. Claims and criteria: `docs/REFLECTED_FREEZE.md` (approved 2026-11-04). Before freezing, the R1 scoring code was dry-run on validation through a scratch copy of the dev plan with `primary_pairs` (`outputs/diagnostics/reflected-r1-dry.json`, job 3312398, 5:17): 48 of 48, matching the exploration. All 27 cells' test predictions were checked present, and `outputs/reflected-v1` did not exist at freezing.
+
+| Job | Role | Outcome | Elapsed |
+| --- | --- | --- | --- |
