@@ -1,0 +1,143 @@
+{
+  "experiment_id": "reflected-v1-dev",
+  "layers_plan": "experiments/layers-v5.json",
+  "cells": [
+    {
+      "model_id": "qwen3-0.6b-base",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "qwen3-0.6b-base",
+      "pooling": "last"
+    },
+    {
+      "model_id": "qwen3-0.6b-embedding",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "qwen3-0.6b-embedding",
+      "pooling": "last"
+    },
+    {
+      "model_id": "qwen3-4b-base",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "qwen3-4b-base",
+      "pooling": "last"
+    },
+    {
+      "model_id": "qwen3-4b-embedding",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "qwen3-4b-embedding",
+      "pooling": "last"
+    },
+    {
+      "model_id": "qwen3-8b-base",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "qwen3-8b-base",
+      "pooling": "last"
+    },
+    {
+      "model_id": "qwen3-8b-embedding",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "qwen3-8b-embedding",
+      "pooling": "last"
+    },
+    {
+      "model_id": "mistral-7b-base",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "mistral-7b-base",
+      "pooling": "last"
+    },
+    {
+      "model_id": "e5-mistral",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "e5-mistral",
+      "pooling": "last"
+    },
+    {
+      "model_id": "gemma2-9b-base",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "gemma2-9b-base",
+      "pooling": "last"
+    },
+    {
+      "model_id": "bge-multilingual-gemma2",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "bge-multilingual-gemma2",
+      "pooling": "last"
+    },
+    {
+      "model_id": "xlmr-base",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "e5-base",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "xlmr-large",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "bge-m3",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "xlmr-base-random",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "qwen3-0.6b-random",
+      "pooling": "mean"
+    }
+  ],
+  "pairs": [
+    [
+      "qwen3-0.6b-base",
+      "qwen3-0.6b-embedding"
+    ],
+    [
+      "qwen3-4b-base",
+      "qwen3-4b-embedding"
+    ],
+    [
+      "qwen3-8b-base",
+      "qwen3-8b-embedding"
+    ],
+    [
+      "mistral-7b-base",
+      "e5-mistral"
+    ],
+    [
+      "gemma2-9b-base",
+      "bge-multilingual-gemma2"
+    ],
+    [
+      "xlmr-base",
+      "e5-base"
+    ],
+    [
+      "xlmr-large",
+      "bge-m3"
+    ]
+  ],
+  "minimum_cities": 30,
+  "neighbors": 10,
+  "output_directory": "outputs/reflected-v1-dev"
+}

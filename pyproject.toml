@@ -70,6 +70,7 @@ select = ["E", "F", "I", "UP"]
 "src/come_a_little_bit_closer/models/layer_schemas.py" = ["F722", "F821"]
 "src/come_a_little_bit_closer/projection/schemas.py" = ["F722", "F821"]
 "src/come_a_little_bit_closer/evaluation/location_schemas.py" = ["F722", "F821"]
+"src/come_a_little_bit_closer/evaluation/fix_schemas.py" = ["F722", "F821"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -2,7 +2,7 @@
 
 A radio explorer and research codebase comparing geographic and embedding neighborhoods. FastAPI and DuckDB serve a full-screen HTMX/Canvas globe and a three-dimensional PCA view. The five text baselines are Qwen3, BGE-M3, multilingual E5, EmbeddingGemma 2, and CLAP's text tower.
 
-**Team progress (2026-11-03):** see [docs/PROGRESS.md](docs/PROGRESS.md) for a plain-language summary of the layer-wise probe results, figures, and next steps.
+**Team progress (2026-11-04):** see [docs/PROGRESS.md](docs/PROGRESS.md) for a plain-language summary of the layer-wise probe, reflected-geography and fix results (all tested once on held-out cities), figures, and next steps.
 
 ## Run locally
 

@@ -20,7 +20,11 @@
 - [ ] Add buffered geographic splits and a names-only ablation.
 - [x] Add layerwise hidden-state probes. Validation runs for 19 models (layers-v4 to v6); held-out test run once under layers-v7 on 2026-11-04 (`experiments/LAYERS_V7_CLAIMS.md`, `docs/FREEZE.md`).
 - [x] Check unstable Qwen3-4B-Embedding middle layers in the `latlon` probe: one activation outlier ("Carcassonne, France"); see `experiments/LAYERS_RUNS.md`, layers-v5.
-- [ ] Retrieval proximity metrics (Spearman, overlap@10, excess distance, random baseline) and the layer-by-region map view (see `docs/PROGRESS.md`).
+- [x] Within-country neighbour metrics for cosine retrieval (Spearman ρ, kNN gain); frozen and tested once under reflected-v1 (`experiments/REFLECTED_V1_RESULTS.md`).
+- [ ] Remaining retrieval metrics (overlap@10, excess distance, random baseline on station origins) and the layer-by-region map view (see `docs/PROGRESS.md`).
+- [x] Coordinate-free fix (instruction + layer fusion + distance probe); frozen and tested once under fix-v1 (`experiments/FIX_V1_RESULTS.md`).
+- [ ] Fix baselines on validation: plain similarity instruction, final-layer-only distance probe, Feuerstein et al. 2026 projection.
+- [ ] Fresh held-out places (e.g. GeoNames cities under 15,000 people) for any new frozen claims.
 - [ ] Evaluate H3 candidate recall before using it as a retrieval baseline.
 - [ ] Consider geographic adaptation after the audited controls.
 
