@@ -4,16 +4,19 @@ A plain-language summary of where the project stands, for the team. Technical ru
 
 **Short version.** We built a pipeline that measures, layer by layer, how much geographic information is inside a language model, and ran it on 18 models. Larger decoder models know where a city lies *within its country*, not just which country it is in, and retrieval training (turning a base model into a search-embedding model) does **not** throw that information away. Encoder models (XLM-R, E5, BGE-M3, and the 3.5B XLM-R XL) show at most a small amount. On 2026-11-04 we ran the held-out **test** split once, on a list of layers and claims frozen beforehand; the main findings held (see "Test results" below).
 
+The same day, two further analyses were frozen and tested once each:
+
+- **What search uses.** Retrieval models' search vectors reflect within-country geography more than their base models' do. They reach about a third of the way to the true nearest neighbours.
+- **A coordinate-free fix.** An instruction, plus mixing in an earlier layer, plus a small learned distance map, gets search to about half of that ceiling without hurting general text similarity.
+
 ## Where the code is
 
 | Branch | What it holds | Status |
 |---|---|---|
-| `master` | proposal, radio-station explorer, final-embedding location experiments | default branch |
-| `ops/bc-cluster` | BC Andromeda cluster setup (`ops/bc.env`, `ops/README.md`) | pushed, not merged |
-| `research/layer-probes` | layer-wise probing pipeline, first results | pushed, not merged |
-| `research/probe-credibility` | **latest**: stronger probes, more models, this page, the project update | built on `research/layer-probes` |
+| `master` | Everything through the layer-probe test: explorer, location experiments, layer probes (PR #4) | default branch |
+| `research/fixes-and-results` | **Latest.** Reflected geography (frozen and tested), the coordinate-free fix (frozen and tested), the paper results section | pushed, to be merged into `master` |
 
-To see everything: `git fetch && git checkout research/probe-credibility`.
+Older branches (`research/layer-probes`, `research/probe-credibility`, `research/per-place-predictions`, `research/reflected-geography`, `ops/bc-cluster`) are fully contained in these two.
 
 ## The question
 
@@ -184,6 +187,8 @@ The one-page update is [`paper/update/TeamN.tex`](../paper/update/TeamN.tex) (PD
 
 Fallback if V2 lags: static per-layer maps answer C1–C2.
 
+Overlap to coordinate: `evaluation/layer_reflected.py` already computes within-country neighbour metrics (Spearman ρ between similarity and distance, and kNN gain) for 17 models, on validation and test. Reuse it for the retrieval-metrics row rather than writing a second implementation.
+
 ## Beyond the course: is this publishable?
 
 Honest assessment as of 2026-11-04: a solid workshop paper (e.g. BlackboxNLP) now; a Findings-level paper depends on the retrieval experiments below.
@@ -193,10 +198,20 @@ Honest assessment as of 2026-11-04: a solid workshop paper (e.g. BlackboxNLP) no
   - Size: a 3.5B encoder behaves like the small ones.
   - Fame: the signal holds for the smallest fifth of cities.
   - Validation optimism: the test gains held.
-- **Still open:** probes show decodability, not use. Encoders are not exactly zero on spatial-block, so the claim is a gap in size, not "none". Encoders and decoders also differ in training objective and data, not just architecture.
+- **Addressed since then (2026-11-04, frozen and tested):**
+  - Decodability vs use: search vectors reflect part of the geography (reflected-v1).
+  - A cheap fix raises it to about half the ceiling, with no STS cost (fix-v1).
+- **Still open:**
+  - Encoders are not exactly zero on spatial-block, so the claim is a gap in size, not "none".
+  - Encoders and decoders also differ in training objective and data, not just architecture.
+  - The fix lacks three baselines: a plain similarity instruction, the distance map on the final layer only, and Feuerstein et al.'s projection.
+  - The held-out test cities have now backed three frozen claim sets (layers-v7, reflected-v1, fix-v1). New claims should be tested on fresh places.
 - **Related work to position against** (found 2026-11-04): Feuerstein et al. 2026 (arXiv 2609.05721) recover geography from output embeddings with a few-seed projection and suggest geographic ranking. Their method is the natural baseline for our fix, and our country control is the main difference. Srinivasagan & Georges 2026 (arXiv 2609.00454) add coordinates through training, a contrast. Jiang et al. 2026 (arXiv 2605.12714) compare embedders and base LLMs layer by layer, without geography.
-- **The strongest direction:** show that cosine search ignores the within-country signal per region (the decodable-vs-reflected analysis). Then test a cheap fix (reweighting along the probe direction) against Feuerstein et al.'s projection and against geocoding plus distance reranking, with a trade-off curve against genre precision.
+- **Next for the paper:**
+  1. Run the three missing fix baselines on validation.
+  2. Get fresh held-out places (for example, GeoNames cities under 15,000 people) for any new claims.
+  3. Draft the introduction, method and related work around the results in `paper/results.tex`.
 
 ## Reproducing
 
-Cluster setup: [`ops/README.md`](../ops/README.md) (BC Andromeda section). Run logs, job IDs, plan hashes, and checksums: [`experiments/LAYERS_RUNS.md`](../experiments/LAYERS_RUNS.md). Design and plan: [`docs/superpowers/specs/2026-11-02-layerwise-probes-design.md`](superpowers/specs/2026-11-02-layerwise-probes-design.md) and [`docs/superpowers/plans/2026-11-02-layerwise-probes.md`](superpowers/plans/2026-11-02-layerwise-probes.md). Extracted features (about 370 GB) and raw outputs are not in git; they are on the cluster under `/projects/weilab/zhangdjr/ComeALittleCloser`.
+Cluster setup: [`ops/README.md`](../ops/README.md) (BC Andromeda section). Run logs, job IDs, plan hashes, and checksums: [`experiments/LAYERS_RUNS.md`](../experiments/LAYERS_RUNS.md), [`experiments/REFLECTED_RUNS.md`](../experiments/REFLECTED_RUNS.md) and [`experiments/FIX_RUNS.md`](../experiments/FIX_RUNS.md). Design and plan: [`docs/superpowers/specs/2026-11-02-layerwise-probes-design.md`](superpowers/specs/2026-11-02-layerwise-probes-design.md) and [`docs/superpowers/plans/2026-11-02-layerwise-probes.md`](superpowers/plans/2026-11-02-layerwise-probes.md). Extracted features (about 370 GB) and raw outputs are not in git; they are on the cluster under `/projects/weilab/zhangdjr/ComeALittleCloser`.
