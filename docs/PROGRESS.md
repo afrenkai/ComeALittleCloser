@@ -134,6 +134,20 @@ This changes the paper's angle. The earlier hypothesis was "geography is encoded
 - **The best model reaches about a third of the ceiling** (e5-mistral: 0.25-0.27 vs 0.73-0.75).
 - **The shift from probe-decodable to neighbour-accessible held up and got stronger.** It is positive in all 24 runs and significant in 19 (validation: 17). It holds only within known regions, not for held-out regions.
 
+## A coordinate-free fix, tested (2026-11-04)
+
+Branch `research/fixes-and-results`; log in [`experiments/FIX_RUNS.md`](../experiments/FIX_RUNS.md). If retrieval models surface only part of the geography they hold, can cosine-style search be made to use more of it without giving the model coordinates? Exploration on validation found three cheap components that add up:
+
+1. a geography task instruction ("Given the name of a place, retrieve places that are geographically closest to it");
+2. adding the cosine of an intermediate layer;
+3. a small rank-32 distance map trained on training cities.
+
+The claims were frozen ([`docs/FIX_FREEZE.md`](FIX_FREEZE.md)), and the test ran once ([`experiments/FIX_V1_RESULTS.md`](../experiments/FIX_V1_RESULTS.md)):
+
+- **F1 passed (12/12).** For e5-mistral and bge-multilingual-gemma2, within-country neighbour quality on held-out cities rises from 0.20-0.26 to 0.35-0.38 (ceiling about 0.74). That is about half the ceiling, up from about a third. On cities this beats blending in true coordinates (w=0.2); on stations the coordinates stay ahead.
+- **F2 passed (12/12).** General semantic similarity (STS-Benchmark test) did not drop; it rose by 0.01-0.03. Caveat: the comparison is against uninstructed cosine, and these models usually expect an instruction.
+- **Qwen3-Embedding-8B** gains geography too, but loses about 0.10 station genre agreement, so the fix is not free for every model.
+
 ## How we got here (2026-11-02 to 2026-11-03)
 
 Each step was a new frozen plan, so earlier results stay reproducible; details and job IDs are in [`experiments/LAYERS_RUNS.md`](../experiments/LAYERS_RUNS.md).
