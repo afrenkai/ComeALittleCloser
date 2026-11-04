@@ -28,8 +28,9 @@ Every fix is compared with plain cosine, the country-lookup baseline (append the
 | 3313230 (array 0-23) | Round 3: F1 (mid layer chosen on 8,000 training cities) and F2 rank 32. Four models × {random-item, spatial-block} × seeds {1729, 2718, 3141} | Completed, 24 of 24 | |
 | 3313258 (array 0-5) | Instruction re-encoding (`instruct_extract.py`): e5-mistral, bge-gemma2 and qwen3-8b-embedding × {geo, generic} instruction on both sides; last-token states, upper half of layers; gtml L40S | Completed | 15:35-21:26 |
 | 3314426 (array 0-5) | Harness on the instructed vectors (seed 1729, random-item; F1, F2) | Completed | 2:26-15:19 |
-| 3315040 (array 0-5) | Re-encoding with two alternative geography phrasings (geo2, geo3) × 3 models | Running | |
-| 3315041 (array 0-17) | Harness on geo-instructed vectors × 3 models × 2 splits × 3 seeds | Running | |
+| 3315040 (array 0-5) | Re-encoding with two alternative geography phrasings (geo2, geo3) × 3 models | Completed | |
+| 3315041 (array 0-17) | Harness on geo-instructed vectors × 3 models × 2 splits × 3 seeds | Completed | |
+| 3316551 (array 0-5) | Harness on geo2 and geo3 vectors (seed 1729, random-item) | Completed | 1:24-3:57 |
 
 ## Round 1 (random-item, seed 1729)
 
@@ -106,3 +107,39 @@ City kNN gain / station kNN gain / genre agreement:
 - **The geo instruction combines with F1+F2.** For e5-mistral and bge-gemma2, city kNN gain is 0.349 and 0.329 (+45% and +62% over the uninstructed output), above the geocoder blend. Station within-country gain is 0.231-0.247, near the blend's 0.253-0.257. Genre agreement is unchanged (0.516 vs 0.520; 0.522 vs 0.511).
 - **For Qwen3-8B, the geo instruction trades genre for geography:** genre 0.639 to 0.543.
 - **Not yet checked:** other seeds and splits, other phrasings, and whether a geography instruction harms retrieval when the query is about something other than place. Instructions would be applied only to geographic queries, but the index side (documents) here is also instructed.
+
+## F5 robustness
+
+**Seeds and splits** (geo instruction, job 3315041). Change vs uninstructed cosine, range over three seeds; city kNN gain, station kNN gain, genre agreement:
+
+| Model | Split | Geo instruction alone | Geo + F1 + F2 (lambda=0.1) |
+| --- | --- | --- | --- |
+| e5-mistral | random-item | city +0.071..+0.079, station +0.018, genre -0.005 | city +0.106..+0.112 (0.361), station +0.041..+0.043, genre -0.004..-0.002 |
+| e5-mistral | spatial-block | city +0.074..+0.084, station +0.018, genre -0.005 | city +0.114..+0.131 (0.358), station +0.039..+0.041, genre -0.003..+0.001 |
+| bge-gemma2 | random-item | city +0.062..+0.075, station +0.036, genre +0.010 | city +0.136..+0.149 (0.344), station +0.055..+0.059, genre +0.011..+0.013 |
+| bge-gemma2 | spatial-block | city +0.044..+0.055, station +0.036, genre +0.010 | city +0.122..+0.140 (0.344), station +0.054..+0.056, genre +0.012..+0.014 |
+| qwen3-8b-emb | random-item | city +0.078..+0.099, station +0.034, genre -0.096 | city +0.097..+0.127 (0.247), station +0.040..+0.043, genre -0.103..-0.082 |
+| qwen3-8b-emb | spatial-block | city +0.067..+0.082, station +0.034, genre -0.096 | city +0.076..+0.102 (0.215), station +0.036..+0.042, genre -0.102..-0.099 |
+
+Station and genre changes are identical across seeds for the instruction alone, because stations are not split. For e5-mistral and bge-gemma2, the geo instruction with F1+F2 raises city within-country kNN gain by 45-70% relative and station within-country gain by 0.04-0.06, with genre agreement within ±0.014, in all 12 runs. That includes held-out regions. Qwen3-8B gains similar geography but loses about 0.1 genre agreement.
+
+**Phrasing** (seed 1729, random-item). City kNN gain / station kNN gain / genre agreement, uninstructed vs three geographic wordings:
+
+| Model | None | geo: "...retrieve places that are geographically closest to it" | geo2: "Represent this place for finding places located near it" | geo3: "...retrieve other locations in the same region of the country" |
+| --- | --- | --- | --- | --- |
+| e5-mistral | 0.240 / 0.188 / 0.520 | 0.316 / 0.206 / 0.515 | 0.280 / 0.197 / 0.511 | 0.329 / 0.206 / 0.512 |
+| bge-gemma2 | 0.192 / 0.190 / 0.511 | 0.254 / 0.226 / 0.521 | 0.240 / 0.202 / 0.516 | 0.276 / 0.221 / 0.516 |
+| qwen3-8b-emb | 0.132 / 0.166 / 0.639 | 0.210 / 0.200 / 0.543 | 0.146 / 0.150 / 0.551 | 0.171 / 0.182 / 0.493 |
+
+All three geographic wordings raise within-country geography in all three models. The size depends on wording: +0.04 to +0.09 on cities for e5-mistral and bge-gemma2. With F1+F2 added, e5-mistral reaches 0.324-0.352 and bge-gemma2 0.314-0.346 across the three wordings. Wording is a free parameter, so a frozen evaluation must fix it in advance; we would fix "geo", the first and pre-chosen wording.
+
+## Where this stands (exploratory, validation)
+
+The best coordinate-free combination is a geography instruction on both sides, plus fusion with an intermediate layer, plus a city-trained distance probe. For e5-mistral and bge-gemma2 it raises within-country neighbour quality from 0.20-0.25 to 0.34-0.36. That is about half of the 0.74 ceiling, up from about a third, with no genre cost. It also improves stations, whose texts it was never fit on.
+
+Remaining before claiming it:
+
+1. A frozen test on held-out cities.
+2. A semantic cost measured on data not used for choosing lambda, the weight, the layer or the instruction. The stations have been used for selection.
+3. A check that instructed documents do not hurt non-geographic queries in a realistic retrieval setting.
+4. Turning `fixes.py` into a tested module.
