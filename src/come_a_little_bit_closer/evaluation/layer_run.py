@@ -1,4 +1,5 @@
 import argparse
+import io
 import os
 import tempfile
 from functools import partial
@@ -13,13 +14,17 @@ from come_a_little_bit_closer.evaluation.layer_extract import (
     feature_path,
 )
 from come_a_little_bit_closer.evaluation.layer_schemas import (
+    BlockScore,
     EvaluationMode,
     FeatureManifest,
+    FinalCell,
+    LayerBlockScores,
     LayerControl,
     LayerDataset,
     LayerPlan,
     LayerProbeScore,
     LayerScoreValues,
+    PlaceErrors,
     Pooling,
     ProbeTarget,
     RunIdentity,
@@ -225,22 +230,7 @@ def country_control_predictions(
 
 
 @jaxtyped(typechecker=beartype)
-def country_control_errors(
-    targets: ProbeTargets,
-    country_codes: list[str],
-    manifest: SplitManifest,
-    plan: LayerPlan,
-    mode: EvaluationMode,
-) -> ScoreVector:
-    return angular_errors(
-        country_control_predictions(targets, country_codes, manifest, mode),
-        targets[evaluated_indices(manifest, mode)],
-        plan.geometry.earth_radius_km,
-    )
-
-
-@jaxtyped(typechecker=beartype)
-def score_layer(
+def evaluate_layer(
     features: ProbeFeatures,
     targets: ProbeTargets,
     coordinates: CoordinateMatrix,
@@ -250,7 +240,7 @@ def score_layer(
     mode: EvaluationMode,
     control: LayerControl,
     probe_target: ProbeTarget,
-) -> LayerScoreValues:
+) -> tuple[LayerScoreValues, PlaceErrors]:
     evaluated = evaluated_indices(manifest, mode)
     predictions, raw, alpha = layer_predictions(
         features,
@@ -266,15 +256,111 @@ def score_layer(
     errors = angular_errors(
         predictions, targets[evaluated], plan.geometry.earth_radius_km
     )
-    return summarize(
+    country = country_control_predictions(targets, country_codes, manifest, mode)
+    country_errors = angular_errors(
+        country, targets[evaluated], plan.geometry.earth_radius_km
+    )
+    block_ids = [manifest.assignments[int(row)].block_id for row in evaluated]
+    values = summarize(
         errors,
-        country_control_errors(targets, country_codes, manifest, plan, mode),
-        [manifest.assignments[int(row)].block_id for row in evaluated],
+        country_errors,
+        block_ids,
         plan,
         alpha,
         raw if probe_target == "latlon" else vectors_to_coordinates(predictions),
         coordinates[evaluated],
     )
+    return values, PlaceErrors(
+        rows=evaluated,
+        block_ids=block_ids,
+        predicted_coordinates=vectors_to_coordinates(predictions),
+        raw_outputs=raw,
+        country_coordinates=vectors_to_coordinates(country),
+        errors_km=errors,
+        country_errors_km=country_errors,
+    )
+
+
+@jaxtyped(typechecker=beartype)
+def score_layer(
+    features: ProbeFeatures,
+    targets: ProbeTargets,
+    coordinates: CoordinateMatrix,
+    country_codes: list[str],
+    manifest: SplitManifest,
+    plan: LayerPlan,
+    mode: EvaluationMode,
+    control: LayerControl,
+    probe_target: ProbeTarget,
+) -> LayerScoreValues:
+    return evaluate_layer(
+        features,
+        targets,
+        coordinates,
+        country_codes,
+        manifest,
+        plan,
+        mode,
+        control,
+        probe_target,
+    )[0]
+
+
+def block_scores(places: PlaceErrors) -> list[BlockScore]:
+    groups: dict[str, list[int]] = {}
+    for position, block_id in enumerate(places.block_ids):
+        groups.setdefault(block_id, []).append(position)
+    return [
+        BlockScore(
+            block_id=block_id,
+            items=len(groups[block_id]),
+            mean_km=float(places.errors_km[groups[block_id]].mean()),
+            country_mean_km=float(places.country_errors_km[groups[block_id]].mean()),
+        )
+        for block_id in sorted(groups)
+    ]
+
+
+def prediction_arrays(
+    places: PlaceErrors, split_kind: SplitKind, seed: int, probe_target: ProbeTarget
+) -> dict[str, np.ndarray]:
+    prefix = f"{split_kind}/{seed}/{probe_target}"
+    return {
+        f"{prefix}/rows": places.rows,
+        f"{prefix}/block_ids": np.asarray(places.block_ids),
+        f"{prefix}/predicted_coordinates": places.predicted_coordinates,
+        f"{prefix}/raw_outputs": places.raw_outputs,
+        f"{prefix}/country_coordinates": places.country_coordinates,
+        f"{prefix}/errors_km": places.errors_km,
+        f"{prefix}/country_errors_km": places.country_errors_km,
+    }
+
+
+def prediction_path(plan: LayerPlan, mode: EvaluationMode, cell: FinalCell) -> Path:
+    return (
+        plan.output_directory
+        / mode
+        / "predictions"
+        / cell.model_id
+        / f"{cell.dataset}-{cell.condition}-{cell.pooling}-{cell.layer}.npz"
+    )
+
+
+def prediction_cells(
+    plan: LayerPlan, model_id: str, mode: EvaluationMode
+) -> set[tuple[LayerDataset, TextCondition, Pooling, int]]:
+    cells = plan.final_cells if mode == "final" else plan.prediction_cells
+    return {
+        (cell.dataset, cell.condition, cell.pooling, cell.layer)
+        for cell in cells
+        if cell.model_id == model_id
+    }
+
+
+def npz_bytes(arrays: dict[str, np.ndarray]) -> bytes:
+    buffer = io.BytesIO()
+    np.savez_compressed(buffer, **arrays)
+    return buffer.getvalue()
 
 
 @jaxtyped(typechecker=beartype)
@@ -411,7 +497,9 @@ def write_atomic(path: Path, content: bytes) -> None:
     os.replace(temporary_path, path)
 
 
-def write_rows(path: Path, rows: list[LayerProbeScore]) -> None:
+def write_rows(
+    path: Path, rows: list[LayerProbeScore] | list[LayerBlockScores]
+) -> None:
     write_atomic(path, "".join(row.model_dump_json() + "\n" for row in rows).encode())
 
 
@@ -454,6 +542,9 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
     )
     checksum = plan_checksum(config_path)
     rows: list[LayerProbeScore] = []
+    block_rows: list[LayerBlockScores] = []
+    predicted_cells = prediction_cells(plan, model_id, mode)
+    predictions: dict[Path, dict[str, np.ndarray]] = {}
     split_records: dict[Path, SplitManifest] = {}
     for dataset, conditions in plan.datasets.items():
         items_by_condition = {
@@ -540,6 +631,26 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
                         )
                 for layer in layers:
                     layer_features = np.asarray(features[layer], dtype=np.float64)
+                    cell_arrays: dict[str, np.ndarray] | None = None
+                    if (dataset, condition, pooling, layer) in predicted_cells:
+                        cell_arrays = {
+                            "item_ids": np.asarray(reference.item_ids),
+                            "true_coordinates": coordinates,
+                            "country_codes": np.asarray(reference.country_codes),
+                        }
+                        predictions[
+                            prediction_path(
+                                plan,
+                                mode,
+                                FinalCell(
+                                    model_id=model_id,
+                                    dataset=dataset,
+                                    condition=condition,
+                                    pooling=pooling,
+                                    layer=layer,
+                                ),
+                            )
+                        ] = cell_arrays
                     for (kind, seed), manifest in manifests.items():
                         for probe_target in plan.probe_targets:
                             controls: list[LayerControl] = (
@@ -548,6 +659,17 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
                                 else ["probe"]
                             )
                             for control in controls:
+                                values, places = evaluate_layer(
+                                    layer_features,
+                                    targets,
+                                    coordinates,
+                                    reference.country_codes,
+                                    manifest,
+                                    plan,
+                                    mode,
+                                    control,
+                                    probe_target,
+                                )
                                 rows.append(
                                     LayerProbeScore(
                                         **identity.model_dump(),
@@ -559,19 +681,27 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
                                         seed=seed,
                                         control=control,
                                         probe_target=probe_target,
-                                        **score_layer(
-                                            layer_features,
-                                            targets,
-                                            coordinates,
-                                            reference.country_codes,
-                                            manifest,
-                                            plan,
-                                            mode,
-                                            control,
-                                            probe_target,
-                                        ).model_dump(),
+                                        **values.model_dump(),
                                     )
                                 )
+                                block_rows.append(
+                                    LayerBlockScores(
+                                        **identity.model_dump(),
+                                        pooling=pooling,
+                                        layer=layer,
+                                        split_kind=kind,
+                                        seed=seed,
+                                        control=control,
+                                        probe_target=probe_target,
+                                        blocks=block_scores(places),
+                                    )
+                                )
+                                if cell_arrays is not None and control == "probe":
+                                    cell_arrays.update(
+                                        prediction_arrays(
+                                            places, kind, seed, probe_target
+                                        )
+                                    )
                     print(
                         f"Scored {model_id} {dataset} {condition} {pooling} {layer}",
                         flush=True,
@@ -587,6 +717,11 @@ def run_model(config_path: Path, model_id: str, mode: EvaluationMode) -> Path:
     write_atomic(plan.output_directory / mode / f"{model_id}.plan.json", plan_bytes)
     for path, manifest in split_records.items():
         write_atomic(path, split_record(manifest))
+    for path, arrays in predictions.items():
+        write_atomic(path, npz_bytes(arrays))
+    write_rows(
+        plan.output_directory / mode / "blocks" / f"{model_id}.jsonl", block_rows
+    )
     write_rows(output_path, rows)
     return output_path
 

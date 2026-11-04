@@ -165,6 +165,15 @@ def layer_model_specs() -> list[LayerModelSpec]:
             revision="5617a9f61b028005a4858fdac845db406aefb181",
             architecture="encoder",
         ),
+        LayerModelSpec(
+            model_id="xlmr-xl",
+            family="xlmr-xl",
+            stage="base",
+            stage_order=1,
+            checkpoint="facebook/xlm-roberta-xl",
+            revision="aa5d120255845efeebc9b7f42822a1dd0f9ece9d",
+            architecture="encoder",
+        ),
         qwen_06b_base.model_copy(
             update={
                 "model_id": "qwen3-0.6b-random",

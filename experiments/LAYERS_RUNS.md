@@ -203,3 +203,94 @@ Country-residual gain over the country centroid (km, best layer by gain, seed me
 | bge-multilingual-gemma2 | 285 [203, 375] | 307 [169, 467] | 185 [80, 311] | 330 [70, 680] |
 
 Observations limited to the tables: both new families show within-country geography larger than Qwen3-8B (175 base, 201 retrieval on cities name-country random-item). The retrieval model is above its base in every Mistral cell and in the Gemma stations cells, and 14-18 km below its base in the Gemma cities name-country cells; every base/retrieval CI pair overlaps, so the result is "retrieval training keeps it" for both families, as for Qwen3. Absolute `sphere` probes (best layer over pooling, cities name-country, random-item) are above the country centroid for all four, with the CI crossing zero only for mistral-7b-base: mistral-7b-base 155 [-37, 397], e5-mistral 423 [201, 689], gemma2-9b-base 349 [127, 607], bge-multilingual-gemma2 459 [246, 713]. On stations random-item, no `sphere` probe of the four beats the centroid (e5-mistral -24 [-280, 271], bge-multilingual-gemma2 -169 [-445, 115]; both bases below with CIs under zero). Latitude/longitude R-squared for both families sits near the country-centroid line at every layer, without the Qwen3-4B-Embedding instability.
+
+## layers-v5 (per-block scores and per-place predictions)
+
+Plan: `experiments/layers-v5.json` (SHA-256 `d3e625af25fb9821f435dcad06fff931359162fd7724a5139e651d723462f1a5`). It is `layers-v4.json` with output `outputs/layers-v5` and 164 `prediction_cells`. Code at commits `7cd4cf5` and `f65bc6f` (branch `research/per-place-predictions`) makes every run also write:
+
+- `outputs/<plan>/<mode>/blocks/<model>.jsonl`: for every scored row (probe and permuted-labels controls), each evaluated 10-degree block's item count, mean probe error (km) and mean country-centroid error (km). These feed the layer-by-region view (V2) and the decodable-vs-reflected correlation.
+- `outputs/<plan>/<mode>/predictions/<model>/<dataset>-<condition>-<pooling>-<layer>.npz`: per-place predicted coordinates, raw ridge outputs, country-centroid prediction, errors and block IDs for every split, seed and probe target (probe control only). Dev mode writes these for `prediction_cells`; final mode writes them for every frozen final cell, so the one test run supports per-region analysis without a rerun.
+
+The main `<model>.jsonl` is unchanged: the check job below reproduced `layers-v4` byte for byte. Prediction cells were chosen from layers-v4 dev results (validation only): for each model, dataset, condition and pooling, the last layer and the layer with the highest seed-mean `country-residual` gain on the random-item split.
+
+Jobs (submitted 2026-11-03):
+
+| Job | Role | Outcome | Elapsed | Node |
+| --- | --- | --- | --- | --- |
+| 3306536 | xlmr-base-random check at `7cd4cf5`, L4 | Completed; `xlmr-base-random.jsonl` byte-identical to layers-v4; blocks 10 MB, predictions 22 MB | 3:37 | grs002 |
+| 3306557-3306574 | all 18 models, `--gres=gpu:l4:1` | Cancelled while pending, resubmitted below to use both gtml nodes | | |
+| 3306575-3306592 | all 18 models at `f65bc6f`, `--gres=gpu:1` (qwen3-8b-base, qwen3-8b-embedding, mistral-7b-base, e5-mistral, gemma2-9b-base, bge-multilingual-gemma2, qwen3-4b-base, qwen3-4b-embedding, qwen3-0.6b-base, qwen3-0.6b-embedding, qwen3-0.6b-random, xlmr-large, bge-m3-retromae, bge-m3-unsupervised, bge-m3, xlmr-base, e5-base, xlmr-base-random, in job-ID order) | Completed 2026-11-04. All 18 `<model>.jsonl` byte-identical to layers-v4. Blocks 691 MB total, 164 prediction files 911 MB | 0:04-8:08 (qwen3-8b pair longest) | grs001, grs002 |
+| 3306597 | latlon diagnosis (script path not visible from compute nodes) | Cancelled before start | | |
+| 3306600 | latlon diagnosis for qwen3-4b-embedding (`outputs/diagnostics/diagnose_latlon.py`, `short`) | Completed | 1:26 | c020 |
+
+Diagnosis of the unstable Qwen3-4B-Embedding latlon R-squared (validation, cities name-country, mean pooling, random-item): the collapse occurs only for seed 1729, whose validation set contains "Carcassonne, France". That item's mean-pooled hidden state has norm 776 at layer 6 against a median of 32 (an activation outlier), and the ridge maps it to raw outputs of about (-1866, 2863) degrees. One point drives the R-squared: at layer 6, R-squared is -0.14 / 0.66 (lat / lon) with it and 0.84 / 0.90 without it; at layer 20, 0.13 / 0.80 with it and 0.90 / 0.93 without it. Seed 2718 has no such item and is stable (0.84-0.90 / 0.90-0.93). Kilometre metrics clip latitude and wrap longitude, so the item adds one bounded error and block-mean km is barely affected. The largest remaining raw errors are Pacific islands near the antimeridian (e.g. Pago Pago, Papeete, Nasinu) whose longitude is predicted tens to 200 degrees off, the expected weakness of a raw-degree longitude target. Implication: raw-output R-squared is not robust to single activation outliers; how R-squared is computed for the test run is a decision for the freeze list.
+| 3311634 | population analysis, first version as a throwaway script (`short`) | Completed; superseded by 3311647 (same numbers up to the bootstrap seed) | 0:14 | |
+| 3311647 | `evaluation.layer_popularity --config experiments/layers-v5.json`, both splits (`short`) | Completed; `outputs/layers-v5/dev/popularity/{random-item,spatial-block}-country-residual.jsonl` | 0:45 | c036 |
+
+Popularity analysis (validation, `country-residual`, cities `name-country`, mean pooling, prediction cells; seeds pooled; the CI is a block bootstrap over the 10-degree blocks within each quintile). The GeoNames population quintiles on random-item have edges of about 20k, 30k, 48k and 92k. A few entries record population 0, so Q1 runs 0-20k. Gain over the country centroid, best layer, Q1 (smallest) vs Q5 (largest):
+
+| Model | random-item Q1 | random-item Q5 | spatial-block Q1 | spatial-block Q5 |
+| --- | --- | --- | --- | --- |
+| qwen3-4b-base | 60 [13, 114] | 181 [127, 245] | 103 [46, 167] | 166 [86, 251] |
+| qwen3-8b-base | 120 [56, 199] | 237 [173, 308] | 136 [66, 210] | 213 [123, 321] |
+| mistral-7b-base | 170 [94, 258] | 307 [230, 392] | 177 [90, 281] | 267 [161, 384] |
+| gemma2-9b-base | 221 [140, 312] | 350 [265, 449] | 208 [124, 304] | 312 [216, 432] |
+| qwen3-8b-embedding | 128 [66, 203] | 266 [199, 341] | 138 [74, 205] | 261 [147, 402] |
+| e5-mistral | 155 [83, 242] | 319 [241, 405] | 120 [49, 208] | 277 [163, 407] |
+| bge-multilingual-gemma2 | 188 [116, 274] | 347 [263, 442] | 185 [104, 273] | 290 [181, 421] |
+| qwen3-0.6b-base | 8 [-9, 27] | 36 [8, 64] | 14 [-6, 37] | 46 [10, 86] |
+| qwen3-0.6b-embedding | 2 [-14, 19] | 27 [2, 53] | 12 [-7, 32] | 35 [1, 72] |
+| xlmr-large | 1 [-4, 6] | 1 [-3, 6] | -2 [-14, 9] | 11 [-1, 25] |
+
+Every decoder from 4B up (base and retrieval) has a gain CI above 0 even for the smallest fifth of cities, and the largest fifth gains about 1.5-3 times more. The within-country signal is not limited to famous places, but popularity modulates it. The 0.6B decoders show gain only for the largest cities, consistent with knowing only well-known places. The encoders show none in any quintile at their best layer. At the last layer a few encoder Q5 intervals on spatial-block sit just above 0 (xlmr-large 17 [2, 34], bge-m3 13 [3, 25]); these are among many uncorrected comparisons. Caveat: quintiles differ in geography as well as fame (large cities concentrate in some countries), so this is descriptive, not causal.
+
+
+## layers-v6 (encoder size control: XLM-R XL)
+
+Plan: `experiments/layers-v6.json` (SHA-256 `2eabc1f1e33c0938de8756b0d43f4b359688278afe6cc48ba0d7e9505911880a`), which is `layers-v5.json` plus `xlmr-xl` (`facebook/xlm-roberta-xl` at `aa5d120255845efeebc9b7f42822a1dd0f9ece9d`, 3.5B parameters), written to `outputs/layers-v6`. Extraction plan `experiments/layers-v6-extract-batch8.json` (SHA-256 `3a706b6732e5cb209176d1e0a8a7dfbd5dd1c450ec2b2efd9da96cd1ab8f8145`; differs only in `experiment_id` and `batch_size` 8). Code at commit `7c9aa27`.
+
+Purpose: every encoder in layers-v4 has at most 0.6B parameters and every decoder showing within-country geography has at least 4B, so "encoders show none" is confounded with size. XLM-R XL is a base-only control (no retrieval model is trained from it), registered as its own family; the registry test now allows single-stage base-only families. Only `xlmr-xl` needs to run under v6; the other 18 models are identical to layers-v5.
+
+| Job | Role | Outcome | Elapsed | Node |
+| --- | --- | --- | --- | --- |
+| 3306604 | download `facebook/xlm-roberta-xl` safetensors (`short`) | Completed | 8:13 | c002 |
+| 3306616 | xlmr-xl extraction, batch 8, `short` GPU (after 3306604) | Completed | 6:56 | g016 |
+| 3306617 | xlmr-xl dev probe, gtml (after 3306616) | Completed; 2682 rows | 1:00:34 | grs002 |
+
+Result (validation, `country-residual`, cities `name-country`, mean pooling, best layer by seed-mean gain; the CI range spans the three seeds' block-bootstrap CIs). Corrected 2026-11-04: the first version of this table averaged mean and last-token pooling for the two Qwen rows, which understated Qwen3-4B (74 km). The frozen cells were unaffected; they were chosen per pooling.
+
+| Model | Params | cities name-country, random-item | cities name-country, spatial-block |
+| --- | --- | --- | --- |
+| xlmr-large | 0.56B | 1.2 km [-4.2, 11.1] (layer 3) | 8.2 km [-23.1, 57.0] (layer 15) |
+| bge-m3 | 0.56B | 10.6 km [-10.2, 36.3] (layer 16) | 21.4 km [-11.1, 81.4] (layer 18) |
+| xlmr-xl | 3.5B | 5.8 km [-8.1, 21.6] (layer 32) | 18.4 km [-13.4, 51.3] (layer 21) |
+| qwen3-0.6b-base | 0.6B | 11.8 km [-9.7, 38.5] (layer 24) | 47.5 km [0.2, 159.4] (layer 28) |
+| qwen3-4b-base | 4B | 119.6 km [61.8, 204.5] (layer 34) | 157.9 km [62.7, 315.5] (layer 35) |
+
+A 3.5B masked-language-model encoder shows no within-country gain, the same as the 0.56B encoders, while a 4B decoder does. On validation, size alone does not explain the encoder result. The claim to test is "MLM encoders up to 3.5B show none", not "small models show none". Qwen3-0.6B shows little (12 km on random-item, CI spanning 0; 48 km on spatial-block), so among decoders size still matters. Because every best layer is chosen on validation, these gains are optimistic; the test run decides.
+
+## layers-v7 (held-out test run)
+
+Plan: `experiments/layers-v7.json` (SHA-256 `81c161719c1a6e0a37ee9b555356a7c53bec0b14b2e3e38c3c44ba6c1766d0e1`), written to `outputs/layers-v7`. It is `layers-v6.json` with 169 `final_cells`, all other settings identical (models, splits, seeds, alphas, bootstrap, features). The cells are the approved freeze list in `docs/FREEZE.md`: per model, dataset, condition and pooling, the best validation layer (highest seed-mean `country-residual` gain, random-item, layers-v4/v6 dev) and the last layer. That gives 164 cells for the 18 layers-v5 models and 5 for `xlmr-xl`. All 169 were checked against the feature manifests before freezing. The claims and pass criteria (H1-H6) were fixed in `docs/FREEZE.md` before any test data was scored. `outputs/layers-v7` did not exist when the plan was committed.
+
+Final mode fits each probe on the training split, selects alpha on validation, and scores the test split once per model; the runner refuses a second run and a differing split file. Do not edit this plan; any change needs a new version and is reported as post hoc.
+
+| Job | Role | Outcome | Elapsed | Node |
+| --- | --- | --- | --- | --- |
+| 3312021-3312039 | final (test) run, one job per model at `4a1ae04`, gtml `--gres=gpu:1` (qwen3-0.6b-base, qwen3-0.6b-embedding, qwen3-4b-base, qwen3-4b-embedding, qwen3-8b-base, qwen3-8b-embedding, mistral-7b-base, e5-mistral, gemma2-9b-base, bge-multilingual-gemma2, xlmr-base, e5-base, xlmr-large, bge-m3-retromae, bge-m3-unsupervised, bge-m3, qwen3-0.6b-random, xlmr-base-random, xlmr-xl, in job-ID order) | Completed 2026-11-04, all 19; 169 prediction files | 0:34-25:15 | grs001, grs002 |
+| 3312049 | dry run of `evaluation.layer_claims` on validation outputs (fixture in login-node `/tmp`, not visible to compute nodes) | Cancelled | | |
+| 3312050, 3312166 | dry run of `evaluation.layer_claims` on validation outputs (layers-v5/v6 dev linked under the v7 cells; `outputs/diagnostics/claims-dry/`) | Completed; report runs end to end. 3312166 adds the both-splits H2 direction summary | 0:55 | |
+
+Validation dry run of the frozen scoring (no test data read). On validation, H1, H2 and H6 pass. H4 fails for qwen3-4b-embedding only (seed lower bounds -1, -55, -10 km). H3 fails for xlmr-base and e5-base on spatial-block (one seed each above 0 with gain over 20 km: 21 [1, 41] and 32 [5, 58]). Spatial-block holds out whole 10-degree blocks, so the training-only country centroid is biased for held-out regions and even weak probes can beat it. The frozen criteria are not changed; the test decides.
+| 3312177 | `evaluation.layer_popularity --mode final` (both splits), then `evaluation.layer_claims --config experiments/layers-v7.json --mode final` (`short`, after the test jobs) | Completed; `outputs/layers-v7/final/claims.md`, copied to `experiments/LAYERS_V7_CLAIMS.md` | 1:01 | c013 |
+
+Test results (scored exactly as frozen in `docs/FREEZE.md`; full tables in `experiments/LAYERS_V7_CLAIMS.md`):
+
+- **H1 supported.** Every 4B+ decoder (base and retrieval) beats the country centroid on test, with all three seeds' CIs above 0 on both splits. Test gains are similar to or larger than validation (e.g. Qwen3-4B base 118-146 km random-item; Gemma-2-9B 296-325 km), so selecting layers on validation did not inflate the result.
+- **H2 supported** (retrieval keeps the gain in all four pairs). No pair earns an "improves" or "removes" claim: the only consistent difference is Gemma on random-item (retrieval 21-31 km lower, all seeds), which spatial-block does not confirm.
+- **H3 not supported.** On random-item every encoder is near 0 (at most 12 km). On spatial-block, bge-m3-unsupervised (35 [5, 66]) and xlmr-xl (20 [4, 39]) each have one seed with a CI above 0 and gain of at least 20 km. The pre-registered statement "encoders show none" fails. What the data supports is a large gap in size: encoders gain at most 50 km on any run, while every 4B+ decoder gains at least 116 km. XLM-R XL behaves like the small encoders, not like the decoders.
+- **H4 not supported** under the all-seeds rule. The output vectors of Qwen3-8B-Embedding, e5-mistral and bge-multilingual-gemma2 beat the country centroid on every seed (332-451 km). Qwen3-4B-Embedding does on two seeds (252 [46, 527], 286 [49, 560]) but not the third (193 [-55, 476]).
+- **H5 (descriptive).** Every model's lat/lon R² (0.74-0.93 lat, 0.83-0.95 lon) is below the country centroid's (0.95 / 0.98), and frozen random-init models reach 0.79 / 0.87 (Qwen3-0.6B) and 0.74 / 0.83 (XLM-R base). Clipping changes nothing at the frozen layers; the Carcassonne outlier affected other layers.
+- **H6 supported.** Every H1 model beats the country centroid on the smallest fifth of cities (gain 72-224 km, lower bounds 19-140 km) on both splits.
+
+These are the test results; they are not to be rerun or rescored with different criteria. Any further analysis of `outputs/layers-v7/final` is post hoc and must be labelled so.

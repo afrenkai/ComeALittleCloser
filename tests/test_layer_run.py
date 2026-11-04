@@ -16,6 +16,7 @@ from come_a_little_bit_closer.evaluation.layer_schemas import (
     DatasetItems,
     FeatureManifest,
     FinalCell,
+    LayerBlockScores,
     LayerControl,
     LayerPlan,
     LayerProbeScore,
@@ -369,6 +370,9 @@ def test_final_mode_refuses_rerun(
         for line in output.read_text().splitlines()
     ]
     assert len(rows) == 3 and {row.mode for row in rows} == {"final"}
+    assert (
+        output.parent / "predictions" / "xlmr-base" / "cities-name-mean-1.npz"
+    ).exists()
     with pytest.raises(FileExistsError):
         run_model(config_path, "xlmr-base", "final")
 
@@ -483,3 +487,61 @@ def test_shipped_plans_declare_probe_targets() -> None:
     assert v1.probe_targets == ["sphere"]
     assert v2.probe_targets == ["sphere", "latlon", "country-residual"]
     assert v2.feature_directory == v1.feature_directory
+
+
+def test_dev_run_writes_block_scores_and_requested_predictions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = final_setup(tmp_path, monkeypatch)
+    plan = LayerPlan.model_validate_json(config_path.read_bytes())
+    cell = plan.final_cells[0].model_copy(update={"layer": 1})
+    config_path.write_text(
+        plan.model_copy(
+            update={"prediction_cells": [cell], "probe_targets": ["sphere", "latlon"]}
+        ).model_dump_json()
+    )
+    output = run_model(config_path, "xlmr-base", "dev")
+    rows = [
+        LayerProbeScore.model_validate_json(line)
+        for line in output.read_text().splitlines()
+    ]
+    blocks = [
+        LayerBlockScores.model_validate_json(line)
+        for line in (output.parent / "blocks" / "xlmr-base.jsonl")
+        .read_text()
+        .splitlines()
+    ]
+    probe_rows = [row for row in rows if row.control != "country-centroid"]
+    assert len(blocks) == len(probe_rows)
+    for position, row in enumerate(probe_rows):
+        block_row = blocks[position]
+        assert (row.layer, row.control, row.probe_target) == (
+            block_row.layer,
+            block_row.control,
+            block_row.probe_target,
+        )
+        assert sum(block.items for block in block_row.blocks) == row.evaluated_items
+        assert np.isclose(
+            np.mean([block.mean_km for block in block_row.blocks]), row.block_mean_km
+        )
+    predictions_directory = output.parent / "predictions" / "xlmr-base"
+    assert [path.name for path in predictions_directory.iterdir()] == [
+        "cities-name-mean-1.npz"
+    ]
+    arrays = np.load(predictions_directory / "cities-name-mean-1.npz")
+    errors = arrays["random-item/1/sphere/errors_km"]
+    assert len(errors) == len(arrays["random-item/1/sphere/rows"])
+    assert arrays["random-item/1/latlon/raw_outputs"].shape == (len(errors), 2)
+    assert arrays["item_ids"].shape == (200,)
+
+
+def test_plan_rejects_prediction_cells_outside_the_plan(tmp_path: Path) -> None:
+    cell = FinalCell(
+        model_id="e5-base",
+        dataset="cities",
+        condition="name",
+        pooling="mean",
+        layer=0,
+    )
+    with pytest.raises(ValueError, match="Prediction cell outside"):
+        LayerPlan(**{**tiny_plan(tmp_path).model_dump(), "prediction_cells": [cell]})

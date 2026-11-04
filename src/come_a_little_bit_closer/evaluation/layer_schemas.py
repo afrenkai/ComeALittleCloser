@@ -4,7 +4,11 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from come_a_little_bit_closer.evaluation.location_schemas import ProbeSettings
+from come_a_little_bit_closer.evaluation.location_schemas import (
+    IndexVector,
+    ProbeSettings,
+    SubsetRidgeTargets,
+)
 from come_a_little_bit_closer.geometry.schemas import (
     CoordinateMatrix,
     Coordinates,
@@ -49,6 +53,7 @@ class LayerPlan(ProbeSettings):
     feature_directory: Path
     output_directory: Path
     final_cells: list[FinalCell] = Field(default_factory=list)
+    prediction_cells: list[FinalCell] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def conditions_and_final_cells_are_consistent(self) -> "LayerPlan":
@@ -66,6 +71,15 @@ class LayerPlan(ProbeSettings):
         for cell in self.final_cells:
             if cell.condition not in self.datasets.get(cell.dataset, []):
                 raise ValueError(f"Final cell outside the plan: {cell}")
+        if len({cell.model_dump_json() for cell in self.prediction_cells}) != len(
+            self.prediction_cells
+        ):
+            raise ValueError("Prediction cells must be unique.")
+        for cell in self.prediction_cells:
+            if cell.model_id not in self.model_ids or cell.condition not in (
+                self.datasets.get(cell.dataset, [])
+            ):
+                raise ValueError(f"Prediction cell outside the plan: {cell}")
         return self
 
 
@@ -154,6 +168,99 @@ class ScoreSelection(BaseModel):
     probe_target: ProbeTarget = "sphere"
 
 
+class BlockScore(BaseModel):
+    block_id: str
+    items: int = Field(gt=0)
+    mean_km: float
+    country_mean_km: float
+
+
+class LayerBlockScores(RunIdentity):
+    pooling: Pooling
+    layer: int
+    split_kind: SplitKind
+    seed: int
+    control: LayerControl
+    probe_target: ProbeTarget
+    blocks: list[BlockScore]
+
+
+class PopularityCell(BaseModel):
+    model_id: str
+    cell: str
+    mode: EvaluationMode
+    split_kind: SplitKind
+    probe_target: ProbeTarget
+
+
+class PopularityGain(PopularityCell):
+    quantile: int = Field(gt=0)
+    population_min: int
+    population_max: int
+    items: int = Field(gt=0)
+    blocks: int = Field(gt=0)
+    gain_over_country_km: float
+    gain_ci_low: float
+    gain_ci_high: float
+
+
+class ClaimRoster(BaseModel):
+    """Models behind each frozen claim, as fixed in docs/FREEZE.md."""
+
+    h1_models: list[str] = [
+        "qwen3-4b-base",
+        "qwen3-4b-embedding",
+        "qwen3-8b-base",
+        "qwen3-8b-embedding",
+        "mistral-7b-base",
+        "e5-mistral",
+        "gemma2-9b-base",
+        "bge-multilingual-gemma2",
+    ]
+    h2_pairs: list[tuple[str, str]] = [
+        ("qwen3-4b-base", "qwen3-4b-embedding"),
+        ("qwen3-8b-base", "qwen3-8b-embedding"),
+        ("mistral-7b-base", "e5-mistral"),
+        ("gemma2-9b-base", "bge-multilingual-gemma2"),
+    ]
+    secondary_pairs: list[tuple[str, str]] = [
+        ("qwen3-0.6b-base", "qwen3-0.6b-embedding"),
+        ("xlmr-base", "e5-base"),
+        ("xlmr-large", "bge-m3"),
+    ]
+    h3_models: list[str] = [
+        "xlmr-base",
+        "e5-base",
+        "xlmr-large",
+        "bge-m3-retromae",
+        "bge-m3-unsupervised",
+        "bge-m3",
+        "xlmr-xl",
+    ]
+    h3_gain_floor_km: float = 20.0
+    h4_models: list[str] = [
+        "qwen3-4b-embedding",
+        "qwen3-8b-embedding",
+        "e5-mistral",
+        "bge-multilingual-gemma2",
+    ]
+    h4_secondary_models: list[str] = ["e5-base", "bge-m3"]
+    random_init_models: list[str] = ["qwen3-0.6b-random", "xlmr-base-random"]
+
+
+@dataclass(frozen=True)
+class PlaceErrors:
+    """Per-place outcomes of one fitted probe on the evaluated rows."""
+
+    rows: IndexVector
+    block_ids: list[str]
+    predicted_coordinates: CoordinateMatrix
+    raw_outputs: SubsetRidgeTargets
+    country_coordinates: CoordinateMatrix
+    errors_km: ScoreVector
+    country_errors_km: ScoreVector
+
+
 class SeedRange(BaseModel):
     mean: float
     low: float
@@ -207,6 +314,7 @@ class StagePalette(BaseModel):
             "gemma2-9b",
             "xlmr-base",
             "xlmr-large",
+            "xlmr-xl",
         ]
     )
     arrow_sample: int = 1500
