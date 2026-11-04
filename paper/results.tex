@@ -205,12 +205,39 @@ On spatial-block, the probe beats nearest neighbours for every base model (12 of
 We tested a cheap fix (validation cities, seed 1729 only; exploratory, not frozen). A ridge probe from the normalised last-layer vector to the unit-sphere position, fit on training cities, was applied unchanged to all 11,833 stations by amplifying its three-dimensional subspace by $1+b$. With $b=10$, the mean distance to a station's 10 cosine neighbours falls for all four 4B+ retrieval models (e.g.\ Qwen3-Embedding-8B: 1,446 to 1,033~km). But appending the station's country centroid, read from its country code ($w=0.1$), lowers it further in every model (652--845 vs.\ 770--1,033~km) at about the same genre-agreement cost (Qwen3-Embedding-4B: 0.538 vs.\ 0.537, from 0.554). The probe fix mainly corrects a neighbour's country; within countries it barely changes city neighbourhoods (kNN gain $+0.003$ to $+0.014$), because the probe's positions are less locally accurate than cosine already is. Appending true coordinates ($w=0.2$, a perfect geocoder) is far stronger (434--617~km). The fix is dominated by a trivial country baseline, and we do not claim it. The few-seed projection of \citet{feuerstein2026recovering} is the natural baseline for any learned fix; we have not run it.
 \todo{decide whether to run the projection of \citet{feuerstein2026recovering} as a baseline.}
 
-\subsection{Closing the gap}
+\subsection{Closing the gap (exploratory, validation only)}
 \label{sec:res-closing}
-% TODO: placeholder. Fixes that make cosine similarity reflect the decodable within-country
-% geography are being explored separately (see docs/PROGRESS.md, "The strongest direction").
-% Compare against: the country-code append baseline above, the projection of
-% \citet{feuerstein2026recovering}, geocoding plus distance reranking, and training-time
-% location signals (\citet{srinivasagan2026location}); report a trade-off curve against genre
-% precision on stations. No results exist yet; do not fill from validation exploration.
-\todo{Closing the gap: results pending (fixes explored separately). Contrast with training-time location embeddings \citep{srinivasagan2026location}.}
+% Source: experiments/FIX_RUNS.md. Validation cities and all stations only; no test data.
+% Lambda, fusion weight, layer and instruction were selected on these data; a frozen test is pending.
+
+We tried coordinate-free changes to frozen retrieval models that do not require a geocoder at query or index time. Cities are fit on training cities and scored on validation cities; stations are never used for fitting and serve as a transfer and cost check. Station genre agreement (share of a station's ten neighbours sharing a genre tag) measures the semantic cost. The country-code baseline cannot change within-country structure by construction.
+
+Three components help, and they combine.
+(i) \emph{Layer fusion}: adding the centred cosine of an intermediate layer, chosen on training cities (e5-mistral layers 25--26, bge-multilingual-gemma2 layer 32), improves within-country neighbours and genre agreement together.
+(ii) \emph{A distance probe}: a rank-32 linear map trained on training cities with a triplet loss (anchor, one of its ten nearest same-country cities, a random same-country city), in the spirit of structural probes; its squared distance is subtracted from the cosine score. Unlike the 3-D position probe, it targets neighbour ranking within countries. It also improves stations whose texts it was never fit on, and it holds when whole 10$^\circ$ regions are held out.
+(iii) \emph{A task instruction} on both sides (native format; ``Given the name of a place, retrieve places that are geographically closest to it''). A generic instruction (``\ldots retrieve semantically similar text'') has the opposite effect: it lowers within-country geography below the uninstructed vector and raises genre agreement. The instruction therefore steers which facet cosine similarity tracks. All three geographic wordings we tried move in the same direction, with magnitudes that depend on wording.
+
+\begin{table}[t]
+\centering
+\footnotesize
+\caption{Exploratory fixes (validation cities, three seeds, random-item and spatial-block; stations used for evaluation only). City and station columns are within-country kNN gain (ceiling about 0.74); genre is station genre agreement. Values are means over three seeds (random-item).}
+\label{tab:fixes}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+& \multicolumn{3}{c}{e5-mistral} & \multicolumn{3}{c}{bge-multilingual-gemma2} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Method & City & Station & Genre & City & Station & Genre \\
+\midrule
+Cosine (output) & 0.252 & 0.188 & 0.520 & 0.203 & 0.190 & 0.511 \\
+Country-code append ($w=0.1$) & 0.252 & 0.188 & 0.511 & 0.203 & 0.190 & 0.497 \\
+Layer fusion + distance probe & 0.312 & 0.214 & 0.535 & 0.280 & 0.216 & 0.541 \\
+Geography instruction & 0.327 & 0.206 & 0.515 & 0.270 & 0.226 & 0.521 \\
+Instruction + fusion + probe & 0.361 & 0.230 & 0.517 & 0.344 & 0.247 & 0.523 \\
+\midrule
+Geocoder oracle (true positions, $w=0.2$) & 0.301 & 0.257 & 0.505 & 0.246 & 0.253 & 0.492 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For e5-mistral and bge-multilingual-gemma2, the full combination raises within-country neighbour quality on cities from 0.20--0.25 to 0.34--0.36. That is about half of the ceiling, up from about one third. The improvement over cosine holds in all twelve runs (two models $\times$ two splits $\times$ three seeds), with genre agreement within $\pm0.014$ (Table~\ref{tab:fixes}). On cities this exceeds a mild geocoder blend; on stations the geocoder, which has true coordinates, remains ahead. Qwen3-Embedding-8B gains similar geography from the instruction but loses about 0.10 genre agreement. These numbers are exploratory: the weights, layer and instruction were chosen on the same validation cities and stations, and the paper's claim will rest on a frozen test.
+\todo{Frozen test of the combined fix on held-out cities and a semantic set not used for selection; compare with the projection of \citet{feuerstein2026recovering}; contrast with training-time location embeddings \citep{srinivasagan2026location}.}
