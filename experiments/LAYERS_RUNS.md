@@ -219,11 +219,31 @@ Jobs (submitted 2026-11-03):
 | --- | --- | --- | --- | --- |
 | 3306536 | xlmr-base-random check at `7cd4cf5`, L4 | Completed; `xlmr-base-random.jsonl` byte-identical to layers-v4; blocks 10 MB, predictions 22 MB | 3:37 | grs002 |
 | 3306557-3306574 | all 18 models, `--gres=gpu:l4:1` | Cancelled while pending, resubmitted below to use both gtml nodes | | |
-| 3306575-3306592 | all 18 models at `f65bc6f`, `--gres=gpu:1` (qwen3-8b-base, qwen3-8b-embedding, mistral-7b-base, e5-mistral, gemma2-9b-base, bge-multilingual-gemma2, qwen3-4b-base, qwen3-4b-embedding, qwen3-0.6b-base, qwen3-0.6b-embedding, qwen3-0.6b-random, xlmr-large, bge-m3-retromae, bge-m3-unsupervised, bge-m3, xlmr-base, e5-base, xlmr-base-random, in job-ID order) | Submitted; 9 running at 22:30 | | grs001, grs002 |
+| 3306575-3306592 | all 18 models at `f65bc6f`, `--gres=gpu:1` (qwen3-8b-base, qwen3-8b-embedding, mistral-7b-base, e5-mistral, gemma2-9b-base, bge-multilingual-gemma2, qwen3-4b-base, qwen3-4b-embedding, qwen3-0.6b-base, qwen3-0.6b-embedding, qwen3-0.6b-random, xlmr-large, bge-m3-retromae, bge-m3-unsupervised, bge-m3, xlmr-base, e5-base, xlmr-base-random, in job-ID order) | Completed 2026-11-04. All 18 `<model>.jsonl` byte-identical to layers-v4. Blocks 691 MB total, 164 prediction files 911 MB | 0:04-8:08 (qwen3-8b pair longest) | grs001, grs002 |
 | 3306597 | latlon diagnosis (script path not visible from compute nodes) | Cancelled before start | | |
 | 3306600 | latlon diagnosis for qwen3-4b-embedding (`outputs/diagnostics/diagnose_latlon.py`, `short`) | Completed | 1:26 | c020 |
 
 Diagnosis of the unstable Qwen3-4B-Embedding latlon R-squared (validation, cities name-country, mean pooling, random-item): the collapse occurs only for seed 1729, whose validation set contains "Carcassonne, France". That item's mean-pooled hidden state has norm 776 at layer 6 against a median of 32 (an activation outlier), and the ridge maps it to raw outputs of about (-1866, 2863) degrees. One point drives the R-squared: at layer 6, R-squared is -0.14 / 0.66 (lat / lon) with it and 0.84 / 0.90 without it; at layer 20, 0.13 / 0.80 with it and 0.90 / 0.93 without it. Seed 2718 has no such item and is stable (0.84-0.90 / 0.90-0.93). Kilometre metrics clip latitude and wrap longitude, so the item adds one bounded error and block-mean km is barely affected. The largest remaining raw errors are Pacific islands near the antimeridian (e.g. Pago Pago, Papeete, Nasinu) whose longitude is predicted tens to 200 degrees off, the expected weakness of a raw-degree longitude target. Implication: raw-output R-squared is not robust to single activation outliers; how R-squared is computed for the test run is a decision for the freeze list.
+| 3311634 | population analysis, first version as a throwaway script (`short`) | Completed; superseded by 3311647 (same numbers up to the bootstrap seed) | 0:14 | |
+| 3311647 | `evaluation.layer_popularity --config experiments/layers-v5.json`, both splits (`short`) | Completed; `outputs/layers-v5/dev/popularity/{random-item,spatial-block}-country-residual.jsonl` | 0:45 | c036 |
+
+Popularity analysis (validation, `country-residual`, cities `name-country`, mean pooling, prediction cells; seeds pooled; the CI is a block bootstrap over the 10-degree blocks within each quintile). The GeoNames population quintiles on random-item have edges of about 20k, 30k, 48k and 92k. A few entries record population 0, so Q1 runs 0-20k. Gain over the country centroid, best layer, Q1 (smallest) vs Q5 (largest):
+
+| Model | random-item Q1 | random-item Q5 | spatial-block Q1 | spatial-block Q5 |
+| --- | --- | --- | --- | --- |
+| qwen3-4b-base | 60 [13, 114] | 181 [127, 245] | 103 [46, 167] | 166 [86, 251] |
+| qwen3-8b-base | 120 [56, 199] | 237 [173, 308] | 136 [66, 210] | 213 [123, 321] |
+| mistral-7b-base | 170 [94, 258] | 307 [230, 392] | 177 [90, 281] | 267 [161, 384] |
+| gemma2-9b-base | 221 [140, 312] | 350 [265, 449] | 208 [124, 304] | 312 [216, 432] |
+| qwen3-8b-embedding | 128 [66, 203] | 266 [199, 341] | 138 [74, 205] | 261 [147, 402] |
+| e5-mistral | 155 [83, 242] | 319 [241, 405] | 120 [49, 208] | 277 [163, 407] |
+| bge-multilingual-gemma2 | 188 [116, 274] | 347 [263, 442] | 185 [104, 273] | 290 [181, 421] |
+| qwen3-0.6b-base | 8 [-9, 27] | 36 [8, 64] | 14 [-6, 37] | 46 [10, 86] |
+| qwen3-0.6b-embedding | 2 [-14, 19] | 27 [2, 53] | 12 [-7, 32] | 35 [1, 72] |
+| xlmr-large | 1 [-4, 6] | 1 [-3, 6] | -2 [-14, 9] | 11 [-1, 25] |
+
+Every decoder from 4B up (base and retrieval) has a gain CI above 0 even for the smallest fifth of cities, and the largest fifth gains about 1.5-3 times more. The within-country signal is not limited to famous places, but popularity modulates it. The 0.6B decoders show gain only for the largest cities, consistent with knowing only well-known places. The encoders show none in any quintile at their best layer. At the last layer a few encoder Q5 intervals on spatial-block sit just above 0 (xlmr-large 17 [2, 34], bge-m3 13 [3, 25]); these are among many uncorrected comparisons. Caveat: quintiles differ in geography as well as fame (large cities concentrate in some countries), so this is descriptive, not causal.
+
 
 ## layers-v6 (encoder size control: XLM-R XL)
 
@@ -233,6 +253,18 @@ Purpose: every encoder in layers-v4 has at most 0.6B parameters and every decode
 
 | Job | Role | Outcome | Elapsed | Node |
 | --- | --- | --- | --- | --- |
-| 3306604 | download `facebook/xlm-roberta-xl` safetensors (`short`) | Submitted | | |
-| 3306616 | xlmr-xl extraction, batch 8, `short` GPU (after 3306604) | Submitted | | |
-| 3306617 | xlmr-xl dev probe, gtml (after 3306616) | Submitted | | |
+| 3306604 | download `facebook/xlm-roberta-xl` safetensors (`short`) | Completed | 8:13 | c002 |
+| 3306616 | xlmr-xl extraction, batch 8, `short` GPU (after 3306604) | Completed | 6:56 | g016 |
+| 3306617 | xlmr-xl dev probe, gtml (after 3306616) | Completed; 2682 rows | 1:00:34 | grs002 |
+
+Result (validation, `country-residual`, best layer by seed-mean gain; the CI range spans the three seeds' block-bootstrap CIs):
+
+| Model | Params | cities name-country, random-item | cities name-country, spatial-block |
+| --- | --- | --- | --- |
+| xlmr-large | 0.56B | 1.2 km [-4.2, 11.1] (layer 3) | 8.2 km [-23.1, 57.0] (layer 15) |
+| bge-m3 | 0.56B | 10.6 km [-10.2, 36.3] (layer 16) | 21.4 km [-11.1, 81.4] (layer 18) |
+| xlmr-xl | 3.5B | 5.8 km [-8.1, 21.6] (layer 32) | 18.4 km [-13.4, 51.3] (layer 21) |
+| qwen3-0.6b-base | 0.6B | 7.1 km [-9.7, 38.5] (layer 24) | 31.4 km [-12.1, 159.4] (layer 28) |
+| qwen3-4b-base | 4B | 74.4 km [0.2, 204.5] (layer 34) | 120.7 km [9.1, 315.5] (layer 35) |
+
+A 3.5B masked-language-model encoder shows no within-country gain, the same as the 0.56B encoders, while a 4B decoder does. On validation, size alone does not explain the encoder result. The claim to test is "MLM encoders up to 3.5B show none", not "small models show none". Qwen3-0.6B shows none either, so among decoders size still matters. Because every best layer is chosen on validation, these gains are optimistic; the test run decides.

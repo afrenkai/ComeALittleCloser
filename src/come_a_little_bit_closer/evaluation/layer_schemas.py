@@ -185,6 +185,25 @@ class LayerBlockScores(RunIdentity):
     blocks: list[BlockScore]
 
 
+class PopularityCell(BaseModel):
+    model_id: str
+    cell: str
+    mode: EvaluationMode
+    split_kind: SplitKind
+    probe_target: ProbeTarget
+
+
+class PopularityGain(PopularityCell):
+    quantile: int = Field(gt=0)
+    population_min: int
+    population_max: int
+    items: int = Field(gt=0)
+    blocks: int = Field(gt=0)
+    gain_over_country_km: float
+    gain_ci_low: float
+    gain_ci_high: float
+
+
 @dataclass(frozen=True)
 class PlaceErrors:
     """Per-place outcomes of one fitted probe on the evaluated rows."""
