@@ -50,3 +50,15 @@ Everything else in the test output (other conditions, stations, other layers) is
 1. Write `experiments/layers-v7.json` with the approved `final_cells`. Commit it, and record its SHA-256 and the commit in `experiments/LAYERS_RUNS.md`.
 2. Run `--mode final` once per model (Slurm, one job each). The runner refuses a second run, and refuses a split file that differs from the first model's.
 3. Compute H1–H5 exactly as written above, then the per-region and popularity analyses.
+
+## Scoring details (fixed 2026-11-04, after submission and before any test result existed)
+
+The table above leaves some details implicit. These are fixed here before any test output is read, so they are not chosen after seeing results.
+
+- **CI** means each run's 95% block-bootstrap interval (one per split and seed). A claim needing a CI above 0 requires the lower bound to be above 0 for **all three seeds**. On "both splits" it must hold on spatial-block and random-item. The seed mean is reported alongside but does not decide.
+- **H1 models:** qwen3-4b-base, qwen3-4b-embedding, qwen3-8b-base, qwen3-8b-embedding, mistral-7b-base, e5-mistral, gemma2-9b-base, bge-multilingual-gemma2. "Best layer" is the model's frozen non-last cell for cities `name-country`, mean pooling (the last layer if they coincide).
+- **H2 pairs** are the four H1 pairs (Qwen3-4B, Qwen3-8B, Mistral, Gemma). The paired difference is computed per split and seed: retrieval minus base gain, per 10-degree block present in both, bootstrapped with the plan's settings. "Improves" or "removes" is claimed only if all three seeds' paired CIs exclude 0 on the same side, on both splits. The Qwen3-0.6B and encoder pairs are reported as secondary.
+- **H3 models:** xlmr-base, e5-base, xlmr-large, bge-m3-retromae, bge-m3-unsupervised, bge-m3, xlmr-xl. A model is supported if, for every split and seed, its lower bound is at or below 0 or its gain is under 20 km.
+- **H4 models:** qwen3-4b-embedding, qwen3-8b-embedding, e5-mistral, bge-multilingual-gemma2. Last-token pooling at the last layer, as in the table. Encoder retrieval models (mean pooling, last layer) are reported as secondary.
+- **H5** is descriptive. R² is reported raw and with predictions clipped to latitude ±90 and longitude ±180 (primary), computed from the saved raw outputs.
+- **H6** uses the H1 cells with seeds pooled within each split (`evaluation.layer_popularity`). It requires the smallest population quintile's lower bound to be above 0 for every H1 model on both splits.

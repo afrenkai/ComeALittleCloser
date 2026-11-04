@@ -277,3 +277,4 @@ Final mode fits each probe on the training split, selects alpha on validation, a
 
 | Job | Role | Outcome | Elapsed | Node |
 | --- | --- | --- | --- | --- |
+| 3312021-3312039 | final (test) run, one job per model at `4a1ae04`, gtml `--gres=gpu:1` (qwen3-0.6b-base, qwen3-0.6b-embedding, qwen3-4b-base, qwen3-4b-embedding, qwen3-8b-base, qwen3-8b-embedding, mistral-7b-base, e5-mistral, gemma2-9b-base, bge-multilingual-gemma2, xlmr-base, e5-base, xlmr-large, bge-m3-retromae, bge-m3-unsupervised, bge-m3, qwen3-0.6b-random, xlmr-base-random, xlmr-xl, in job-ID order) | Submitted 2026-11-04 | | |
