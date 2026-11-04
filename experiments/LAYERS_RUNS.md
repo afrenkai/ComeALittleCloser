@@ -203,3 +203,36 @@ Country-residual gain over the country centroid (km, best layer by gain, seed me
 | bge-multilingual-gemma2 | 285 [203, 375] | 307 [169, 467] | 185 [80, 311] | 330 [70, 680] |
 
 Observations limited to the tables: both new families show within-country geography larger than Qwen3-8B (175 base, 201 retrieval on cities name-country random-item). The retrieval model is above its base in every Mistral cell and in the Gemma stations cells, and 14-18 km below its base in the Gemma cities name-country cells; every base/retrieval CI pair overlaps, so the result is "retrieval training keeps it" for both families, as for Qwen3. Absolute `sphere` probes (best layer over pooling, cities name-country, random-item) are above the country centroid for all four, with the CI crossing zero only for mistral-7b-base: mistral-7b-base 155 [-37, 397], e5-mistral 423 [201, 689], gemma2-9b-base 349 [127, 607], bge-multilingual-gemma2 459 [246, 713]. On stations random-item, no `sphere` probe of the four beats the centroid (e5-mistral -24 [-280, 271], bge-multilingual-gemma2 -169 [-445, 115]; both bases below with CIs under zero). Latitude/longitude R-squared for both families sits near the country-centroid line at every layer, without the Qwen3-4B-Embedding instability.
+
+## layers-v5 (per-block scores and per-place predictions)
+
+Plan: `experiments/layers-v5.json` (SHA-256 `d3e625af25fb9821f435dcad06fff931359162fd7724a5139e651d723462f1a5`). It is `layers-v4.json` with output `outputs/layers-v5` and 164 `prediction_cells`. Code at commits `7cd4cf5` and `f65bc6f` (branch `research/per-place-predictions`) makes every run also write:
+
+- `outputs/<plan>/<mode>/blocks/<model>.jsonl`: for every scored row (probe and permuted-labels controls), each evaluated 10-degree block's item count, mean probe error (km) and mean country-centroid error (km). These feed the layer-by-region view (V2) and the decodable-vs-reflected correlation.
+- `outputs/<plan>/<mode>/predictions/<model>/<dataset>-<condition>-<pooling>-<layer>.npz`: per-place predicted coordinates, raw ridge outputs, country-centroid prediction, errors and block IDs for every split, seed and probe target (probe control only). Dev mode writes these for `prediction_cells`; final mode writes them for every frozen final cell, so the one test run supports per-region analysis without a rerun.
+
+The main `<model>.jsonl` is unchanged: the check job below reproduced `layers-v4` byte for byte. Prediction cells were chosen from layers-v4 dev results (validation only): for each model, dataset, condition and pooling, the last layer and the layer with the highest seed-mean `country-residual` gain on the random-item split.
+
+Jobs (submitted 2026-11-03):
+
+| Job | Role | Outcome | Elapsed | Node |
+| --- | --- | --- | --- | --- |
+| 3306536 | xlmr-base-random check at `7cd4cf5`, L4 | Completed; `xlmr-base-random.jsonl` byte-identical to layers-v4; blocks 10 MB, predictions 22 MB | 3:37 | grs002 |
+| 3306557-3306574 | all 18 models, `--gres=gpu:l4:1` | Cancelled while pending, resubmitted below to use both gtml nodes | | |
+| 3306575-3306592 | all 18 models at `f65bc6f`, `--gres=gpu:1` (qwen3-8b-base, qwen3-8b-embedding, mistral-7b-base, e5-mistral, gemma2-9b-base, bge-multilingual-gemma2, qwen3-4b-base, qwen3-4b-embedding, qwen3-0.6b-base, qwen3-0.6b-embedding, qwen3-0.6b-random, xlmr-large, bge-m3-retromae, bge-m3-unsupervised, bge-m3, xlmr-base, e5-base, xlmr-base-random, in job-ID order) | Submitted; 9 running at 22:30 | | grs001, grs002 |
+| 3306597 | latlon diagnosis (script path not visible from compute nodes) | Cancelled before start | | |
+| 3306600 | latlon diagnosis for qwen3-4b-embedding (`outputs/diagnostics/diagnose_latlon.py`, `short`) | Completed | 1:26 | c020 |
+
+Diagnosis of the unstable Qwen3-4B-Embedding latlon R-squared (validation, cities name-country, mean pooling, random-item): the collapse occurs only for seed 1729, whose validation set contains "Carcassonne, France". That item's mean-pooled hidden state has norm 776 at layer 6 against a median of 32 (an activation outlier), and the ridge maps it to raw outputs of about (-1866, 2863) degrees. One point drives the R-squared: at layer 6, R-squared is -0.14 / 0.66 (lat / lon) with it and 0.84 / 0.90 without it; at layer 20, 0.13 / 0.80 with it and 0.90 / 0.93 without it. Seed 2718 has no such item and is stable (0.84-0.90 / 0.90-0.93). Kilometre metrics clip latitude and wrap longitude, so the item adds one bounded error and block-mean km is barely affected. The largest remaining raw errors are Pacific islands near the antimeridian (e.g. Pago Pago, Papeete, Nasinu) whose longitude is predicted tens to 200 degrees off, the expected weakness of a raw-degree longitude target. Implication: raw-output R-squared is not robust to single activation outliers; how R-squared is computed for the test run is a decision for the freeze list.
+
+## layers-v6 (encoder size control: XLM-R XL)
+
+Plan: `experiments/layers-v6.json` (SHA-256 `2eabc1f1e33c0938de8756b0d43f4b359688278afe6cc48ba0d7e9505911880a`), which is `layers-v5.json` plus `xlmr-xl` (`facebook/xlm-roberta-xl` at `aa5d120255845efeebc9b7f42822a1dd0f9ece9d`, 3.5B parameters), written to `outputs/layers-v6`. Extraction plan `experiments/layers-v6-extract-batch8.json` (SHA-256 `3a706b6732e5cb209176d1e0a8a7dfbd5dd1c450ec2b2efd9da96cd1ab8f8145`; differs only in `experiment_id` and `batch_size` 8). Code at commit `7c9aa27`.
+
+Purpose: every encoder in layers-v4 has at most 0.6B parameters and every decoder showing within-country geography has at least 4B, so "encoders show none" is confounded with size. XLM-R XL is a base-only control (no retrieval model is trained from it), registered as its own family; the registry test now allows single-stage base-only families. Only `xlmr-xl` needs to run under v6; the other 18 models are identical to layers-v5.
+
+| Job | Role | Outcome | Elapsed | Node |
+| --- | --- | --- | --- | --- |
+| 3306604 | download `facebook/xlm-roberta-xl` safetensors (`short`) | Submitted | | |
+| 3306616 | xlmr-xl extraction, batch 8, `short` GPU (after 3306604) | Submitted | | |
+| 3306617 | xlmr-xl dev probe, gtml (after 3306616) | Submitted | | |
