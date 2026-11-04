@@ -279,20 +279,34 @@ def run_fix(config: Path, mode: EvaluationMode) -> Path:
     genres = station_genres(stations.texts)
     rows_written: list[FixScore] = []
     for model in plan.models:
+        plain_sts, sts_manifest = read_instructed(
+            plan, model.model_id, sts_collection, False
+        )
+        kept = sts_manifest.kept_layers
         plain = {
-            "cities": np.load(
-                feature_path(layers, model.model_id, "cities", "name-country", "last"),
-                mmap_mode="r",
+            "cities": np.asarray(
+                np.load(
+                    feature_path(
+                        layers, model.model_id, "cities", "name-country", "last"
+                    ),
+                    mmap_mode="r",
+                )[kept]
             ),
-            "stations": np.load(
-                feature_path(layers, model.model_id, "stations", "metadata", "last"),
-                mmap_mode="r",
+            "stations": np.asarray(
+                np.load(
+                    feature_path(
+                        layers, model.model_id, "stations", "metadata", "last"
+                    ),
+                    mmap_mode="r",
+                )[kept]
             ),
-            "sts": read_instructed(plan, model.model_id, sts_collection, False)[0],
+            "sts": plain_sts,
         }
         instructed_cities, city_manifest = read_instructed(
             plan, model.model_id, "cities-name-country", True
         )
+        if city_manifest.kept_layers != kept:
+            raise ValueError("Plain and instructed features keep different layers.")
         instructed = {
             "cities": instructed_cities,
             "stations": read_instructed(
@@ -341,7 +355,6 @@ def run_fix(config: Path, mode: EvaluationMode) -> Path:
                         "sts": set_scores(arrays["sts"], None, fitted, plan),
                     }
                     fusion_layers[variant] = fitted.layer
-                plain_layers = plain["cities"].shape[0]
                 city_cosine = scored["plain"]["cities"][0]
                 station_cosine = scored["plain"]["stations"][0]
                 methods: list[
@@ -395,7 +408,7 @@ def run_fix(config: Path, mode: EvaluationMode) -> Path:
                         scored["plain"]["cities"][1],
                         scored["plain"]["stations"][1],
                         scored["plain"]["sts"][1],
-                        fusion_layers["plain"] % plain_layers,
+                        kept[fusion_layers["plain"]],
                     ),
                     (
                         "instruction",
@@ -409,7 +422,7 @@ def run_fix(config: Path, mode: EvaluationMode) -> Path:
                         scored["instructed"]["cities"][1],
                         scored["instructed"]["stations"][1],
                         scored["instructed"]["sts"][1],
-                        city_manifest.kept_layers[fusion_layers["instructed"]],
+                        kept[fusion_layers["instructed"]],
                     ),
                 ]
                 for (
