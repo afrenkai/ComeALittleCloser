@@ -18,7 +18,9 @@
 - [ ] Compare metadata, audio-inferred, and human genre labels.
 - [ ] Audit station coordinates and station-family membership.
 - [ ] Add buffered geographic splits and a names-only ablation.
-- [ ] Add layerwise hidden-state probes.
+- [ ] Add layerwise hidden-state probes. (Dev runs complete for all 18 models under layers-v4, including the Mistral and Gemma pairs; validation results only, summarized in `docs/PROGRESS.md` and recorded in `experiments/LAYERS_RUNS.md`. Next: freeze `final_cells`, then run `final` once.)
+- [ ] Check unstable Qwen3-4B-Embedding middle layers in the `latlon` probe (`r2-by-depth.png`).
+- [ ] Retrieval proximity metrics (Spearman, overlap@10, excess distance, random baseline) and the layer-by-region map view (see `docs/PROGRESS.md`).
 - [ ] Evaluate H3 candidate recall before using it as a retrieval baseline.
 - [ ] Consider geographic adaptation after the audited controls.
 

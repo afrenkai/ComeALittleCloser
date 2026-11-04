@@ -2,6 +2,8 @@
 
 A radio explorer and research codebase comparing geographic and embedding neighborhoods. FastAPI and DuckDB serve a full-screen HTMX/Canvas globe and a three-dimensional PCA view. The five text baselines are Qwen3, BGE-M3, multilingual E5, EmbeddingGemma 2, and CLAP's text tower.
 
+**Team progress (2026-11-03):** see [docs/PROGRESS.md](docs/PROGRESS.md) for a plain-language summary of the layer-wise probe results, figures, and next steps.
+
 ## Run locally
 
 Run commands from the project root with Python 3.12 and uv. Plain `uv sync` and `uv run` select the CPU environment. The `cpu` and `ampere` extras are mutually exclusive; the default `cpu` dependency group activates the CPU extra.

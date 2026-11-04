@@ -1,0 +1,306 @@
+{
+  "experiment_id": "location-v3",
+  "model_ids": [
+    "qwen3",
+    "bge-m3",
+    "e5",
+    "embeddinggemma",
+    "clap"
+  ],
+  "genres": [
+    "alternative rock",
+    "ambient",
+    "blues",
+    "chillout",
+    "classic rock",
+    "classical",
+    "country",
+    "cumbia",
+    "dance",
+    "deep house",
+    "disco",
+    "downtempo",
+    "easy listening",
+    "edm",
+    "electro",
+    "electronic",
+    "electronica",
+    "folk",
+    "funk",
+    "gospel",
+    "grupera",
+    "hard rock",
+    "heavy metal",
+    "hip hop",
+    "house",
+    "indie rock",
+    "jazz",
+    "latin pop",
+    "lounge",
+    "metal",
+    "pop",
+    "pop rock",
+    "punk",
+    "r&b",
+    "ranchera",
+    "reggae",
+    "rock",
+    "salsa",
+    "schlager",
+    "smooth jazz",
+    "soul",
+    "techno",
+    "trance"
+  ],
+  "genre_tags": {
+    "alternative rock": [
+      "alternative rock"
+    ],
+    "ambient": [
+      "ambient"
+    ],
+    "blues": [
+      "blues"
+    ],
+    "chillout": [
+      "chillout"
+    ],
+    "classic rock": [
+      "classic rock",
+      "classic-rock"
+    ],
+    "classical": [
+      "classical"
+    ],
+    "country": [
+      "country"
+    ],
+    "cumbia": [
+      "cumbia"
+    ],
+    "dance": [
+      "dance"
+    ],
+    "deep house": [
+      "deep house",
+      "deep-house"
+    ],
+    "disco": [
+      "disco"
+    ],
+    "downtempo": [
+      "downtempo"
+    ],
+    "easy listening": [
+      "easy listening"
+    ],
+    "edm": [
+      "edm"
+    ],
+    "electro": [
+      "electro"
+    ],
+    "electronic": [
+      "electronic"
+    ],
+    "electronica": [
+      "electronica"
+    ],
+    "folk": [
+      "folk"
+    ],
+    "funk": [
+      "funk"
+    ],
+    "gospel": [
+      "gospel"
+    ],
+    "grupera": [
+      "grupera"
+    ],
+    "hard rock": [
+      "hard rock"
+    ],
+    "heavy metal": [
+      "heavy metal",
+      "heavy-metal"
+    ],
+    "hip hop": [
+      "hip hop",
+      "hip-hop"
+    ],
+    "house": [
+      "house"
+    ],
+    "indie rock": [
+      "indie rock",
+      "indie-rock"
+    ],
+    "jazz": [
+      "jazz"
+    ],
+    "latin pop": [
+      "latin pop"
+    ],
+    "lounge": [
+      "lounge"
+    ],
+    "metal": [
+      "metal"
+    ],
+    "pop": [
+      "pop"
+    ],
+    "pop rock": [
+      "pop rock",
+      "pop-rock"
+    ],
+    "punk": [
+      "punk"
+    ],
+    "r&b": [
+      "r & b",
+      "r&b"
+    ],
+    "ranchera": [
+      "ranchera"
+    ],
+    "reggae": [
+      "reggae"
+    ],
+    "rock": [
+      "rock"
+    ],
+    "salsa": [
+      "salsa"
+    ],
+    "schlager": [
+      "schlager"
+    ],
+    "smooth jazz": [
+      "smooth jazz"
+    ],
+    "soul": [
+      "soul"
+    ],
+    "techno": [
+      "techno"
+    ],
+    "trance": [
+      "trance"
+    ]
+  },
+  "minimum_genre_candidates": 50,
+  "origins": [
+    {
+      "name": "New York",
+      "coordinates": {
+        "latitude": 40.7,
+        "longitude": -74.0
+      }
+    },
+    {
+      "name": "Bogota",
+      "coordinates": {
+        "latitude": 4.7,
+        "longitude": -74.1
+      }
+    },
+    {
+      "name": "Sao Paulo",
+      "coordinates": {
+        "latitude": -23.6,
+        "longitude": -46.6
+      }
+    },
+    {
+      "name": "London",
+      "coordinates": {
+        "latitude": 51.5,
+        "longitude": -0.1
+      }
+    },
+    {
+      "name": "Lagos",
+      "coordinates": {
+        "latitude": 6.5,
+        "longitude": 3.4
+      }
+    },
+    {
+      "name": "Nairobi",
+      "coordinates": {
+        "latitude": -1.3,
+        "longitude": 36.8
+      }
+    },
+    {
+      "name": "Cairo",
+      "coordinates": {
+        "latitude": 30.0,
+        "longitude": 31.2
+      }
+    },
+    {
+      "name": "Mumbai",
+      "coordinates": {
+        "latitude": 19.1,
+        "longitude": 72.9
+      }
+    },
+    {
+      "name": "Singapore",
+      "coordinates": {
+        "latitude": 1.3,
+        "longitude": 103.8
+      }
+    },
+    {
+      "name": "Tokyo",
+      "coordinates": {
+        "latitude": 35.7,
+        "longitude": 139.7
+      }
+    },
+    {
+      "name": "Sydney",
+      "coordinates": {
+        "latitude": -33.9,
+        "longitude": 151.2
+      }
+    },
+    {
+      "name": "Johannesburg",
+      "coordinates": {
+        "latitude": -26.2,
+        "longitude": 28.0
+      }
+    }
+  ],
+  "split_seeds": [
+    1729,
+    2718,
+    3141
+  ],
+  "ridge_alphas": [
+    0.01,
+    0.1,
+    1.0,
+    10.0,
+    100.0
+  ],
+  "block_degrees": 10.0,
+  "train_fraction": 0.6,
+  "validation_fraction": 0.2,
+  "neighbors": 10,
+  "bootstrap_replicates": 1000,
+  "bootstrap_seed": 1618,
+  "batch_size": 32,
+  "artifact_directory": "data/processed/location-v3",
+  "metadata_directory": "data/processed/location-v3/metadata-only",
+  "taxonomy_manifest": "data/musicbrainz-genres.json",
+  "output_directory": "outputs/location-v3",
+  "geometry": {
+    "earth_radius_km": 6371.0088
+  }
+}

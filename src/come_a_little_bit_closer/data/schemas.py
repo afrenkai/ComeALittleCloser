@@ -1,6 +1,10 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from come_a_little_bit_closer.geometry.schemas import Coordinates
+
+type PlaceCondition = Literal["name", "name-country"]
 
 
 class RadioBrowserRecord(BaseModel):
@@ -35,3 +39,12 @@ class DataSummary(BaseModel):
 class StationDataset(BaseModel):
     stations: list[Station]
     summary: DataSummary
+
+
+class Place(BaseModel):
+    place_id: str
+    name: str
+    country_code: str
+    country_name: str
+    population: int = Field(ge=0)
+    coordinates: Coordinates

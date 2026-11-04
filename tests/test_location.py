@@ -22,6 +22,7 @@ from come_a_little_bit_closer.evaluation.probes import (
     unit_predictions,
 )
 from come_a_little_bit_closer.evaluation.splits import (
+    random_split,
     spatial_block,
     spatial_split,
     split_indices,
@@ -59,8 +60,22 @@ def test_spatial_partition_reproducible_and_wraps_dateline(
         station_fixture(index, -70 + index * 5, -170 + index * 11)
         for index in range(28)
     ]
-    first = spatial_split(stations, location_plan, 1729, "source", "plan")
-    assert first == spatial_split(stations, location_plan, 1729, "source", "plan")
+    first = spatial_split(
+        [station.station_id for station in stations],
+        [station.coordinates for station in stations],
+        location_plan,
+        1729,
+        "source",
+        "plan",
+    )
+    assert first == spatial_split(
+        [station.station_id for station in stations],
+        [station.coordinates for station in stations],
+        location_plan,
+        1729,
+        "source",
+        "plan",
+    )
     assert spatial_block(0, -180, 10) == spatial_block(0, 180, 10)
     assert spatial_block(90, 0, 10) == spatial_block(89.99, 0, 10)
     for block in {assignment.block_id for assignment in first.assignments}:
@@ -96,7 +111,14 @@ def test_probe_recovers_sphere_without_test_leakage(
         dtype=np.float64,
     )
     targets = spherical_vectors(coordinates)
-    manifest = spatial_split(stations, location_plan, 1729, "source", "plan")
+    manifest = spatial_split(
+        [station.station_id for station in stations],
+        [station.coordinates for station in stations],
+        location_plan,
+        1729,
+        "source",
+        "plan",
+    )
     train = split_indices(manifest, "train")
     validation = split_indices(manifest, "validation")
     test = split_indices(manifest, "test")
@@ -185,3 +207,27 @@ def test_origin_insensitive_retrieval_has_zero_movement(
         row.neighbor_turnover == 0 and row.movement_toward_origin_km == 0
         for row in responses
     )
+
+
+def test_random_split_is_deterministic_and_disjoint(
+    location_plan: LocationPlan,
+) -> None:
+    stations = [
+        station_fixture(index, -70 + index * 1.3, -170 + index * 3.4)
+        for index in range(100)
+    ]
+    item_ids = [station.station_id for station in stations]
+    coordinates = [station.coordinates for station in stations]
+    first = random_split(item_ids, coordinates, location_plan, 1729, "source", "plan")
+    assert first == random_split(
+        item_ids, coordinates, location_plan, 1729, "source", "plan"
+    )
+    indices = [split_indices(first, name) for name in ("train", "validation", "test")]
+    assert [len(index) for index in indices] == [60, 20, 20]
+    assert sorted(np.concatenate(indices).tolist()) == list(range(100))
+    other = random_split(item_ids, coordinates, location_plan, 1730, "source", "plan")
+    assert other != first
+    for position, assignment in enumerate(first.assignments):
+        assert assignment.block_id == spatial_block(
+            coordinates[position].latitude, coordinates[position].longitude, 10.0
+        )

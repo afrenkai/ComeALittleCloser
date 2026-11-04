@@ -1,3 +1,5 @@
+from functools import partial
+
 import numpy as np
 from beartype import beartype
 from jaxtyping import jaxtyped
@@ -5,16 +7,19 @@ from jaxtyping import jaxtyped
 from come_a_little_bit_closer.evaluation.location_schemas import (
     BlockScores,
     IndexVector,
-    LocationPlan,
+    PredictionDecoder,
     ProbeFeatures,
     ProbeScore,
+    ProbeSettings,
     ProbeTargets,
     RidgeModel,
+    RidgeTargets,
     SplitManifest,
+    TargetRidgeModel,
     TrainingIndices,
     ValidationIndices,
 )
-from come_a_little_bit_closer.geometry.schemas import ScoreVector
+from come_a_little_bit_closer.geometry.schemas import CoordinateMatrix, ScoreVector
 
 
 @jaxtyped(typechecker=beartype)
@@ -51,7 +56,7 @@ def block_means(values: ScoreVector, block_ids: list[str]) -> BlockScores:
 
 
 @jaxtyped(typechecker=beartype)
-def bootstrap_interval(values: ScoreVector, plan: LocationPlan) -> tuple[float, float]:
+def bootstrap_interval(values: ScoreVector, plan: ProbeSettings) -> tuple[float, float]:
     generator = np.random.default_rng(plan.bootstrap_seed)
     draws = generator.integers(0, len(values), (plan.bootstrap_replicates, len(values)))
     limits = np.quantile(values[draws].mean(axis=1), [0.025, 0.975])
@@ -91,41 +96,54 @@ def predict_ridge(model: RidgeModel, features: ProbeFeatures) -> ProbeTargets:
 
 
 @jaxtyped(typechecker=beartype)
-def fit_ridge(
+def predict_targets(model: TargetRidgeModel, features: ProbeFeatures) -> RidgeTargets:
+    return (features - model.feature_mean) @ model.weights + model.target_mean
+
+
+@jaxtyped(typechecker=beartype)
+def fit_ridge_path(
     features: ProbeFeatures,
-    targets: ProbeTargets,
+    targets: RidgeTargets,
+    unit_targets: ProbeTargets,
     train_indices: TrainingIndices,
     validation_indices: ValidationIndices,
     block_ids: list[str],
-    plan: LocationPlan,
-) -> RidgeModel:
+    decoder: PredictionDecoder,
+    plan: ProbeSettings,
+    center_targets: bool = True,
+) -> TargetRidgeModel:
+    """Selects alpha by validation block-mean km of decoded unit-vector predictions."""
     if not np.isfinite(features).all() or not all(
         alpha > 0 for alpha in plan.ridge_alphas
     ):
         raise ValueError(
             "Ridge requires finite features and strictly positive penalties."
         )
-    feature_mean = features[train_indices].mean(axis=0)
-    target_mean = targets[train_indices].mean(axis=0)
-    training = features[train_indices] - feature_mean
+    training_features = features[train_indices]
+    feature_mean = training_features.mean(axis=0)
+    target_mean = (
+        targets[train_indices].mean(axis=0)
+        if center_targets
+        else np.zeros(targets.shape[1])
+    )
+    training = training_features - feature_mean
     eigenvalues, eigenvectors = np.linalg.eigh(training.T @ training)
     transformed_targets = eigenvectors.T @ (
         training.T @ (targets[train_indices] - target_mean)
     )
+    centered_validation = features[validation_indices] - feature_mean
+    validation_targets = unit_targets[validation_indices]
     validation_blocks = [block_ids[int(index)] for index in validation_indices]
-    fallback = coordinate_centroid(targets[train_indices])
     best_score = float("inf")
-    best_model: RidgeModel | None = None
+    best_model: TargetRidgeModel | None = None
     for alpha in plan.ridge_alphas:
         weights = eigenvectors @ (
             transformed_targets / (np.maximum(eigenvalues, 0) + alpha)[:, None]
         )
-        candidate = RidgeModel(feature_mean, target_mean, weights, alpha)
-        predictions = unit_predictions(
-            predict_ridge(candidate, features[validation_indices]), fallback
-        )
+        candidate = TargetRidgeModel(feature_mean, target_mean, weights, alpha)
+        predictions = decoder(centered_validation @ weights + target_mean)
         errors = angular_errors(
-            predictions, targets[validation_indices], plan.geometry.earth_radius_km
+            predictions, validation_targets, plan.geometry.earth_radius_km
         )
         score = float(block_means(errors, validation_blocks).mean())
         if score < best_score:
@@ -136,12 +154,53 @@ def fit_ridge(
 
 
 @jaxtyped(typechecker=beartype)
+def fit_ridge(
+    features: ProbeFeatures,
+    targets: ProbeTargets,
+    train_indices: TrainingIndices,
+    validation_indices: ValidationIndices,
+    block_ids: list[str],
+    plan: ProbeSettings,
+) -> RidgeModel:
+    fallback = coordinate_centroid(targets[train_indices])
+    model = fit_ridge_path(
+        features,
+        targets,
+        targets,
+        train_indices,
+        validation_indices,
+        block_ids,
+        partial(unit_predictions, fallback=fallback),
+        plan,
+    )
+    return RidgeModel(model.feature_mean, model.target_mean, model.weights, model.alpha)
+
+
+@jaxtyped(typechecker=beartype)
+def vectors_to_coordinates(vectors: ProbeTargets) -> CoordinateMatrix:
+    return np.column_stack(
+        (
+            np.degrees(np.arcsin(np.clip(vectors[:, 2], -1.0, 1.0))),
+            np.degrees(np.arctan2(vectors[:, 1], vectors[:, 0])),
+        )
+    )
+
+
+@jaxtyped(typechecker=beartype)
+def r_squared(predicted: ScoreVector, truth: ScoreVector) -> float:
+    total = float(np.sum((truth - truth.mean()) ** 2))
+    if total <= 0:
+        raise ValueError("R-squared requires variation in the evaluated targets.")
+    return 1.0 - float(np.sum((truth - predicted) ** 2)) / total
+
+
+@jaxtyped(typechecker=beartype)
 def score_probe(
     predictions: ProbeTargets,
     targets: ProbeTargets,
     country_errors: ScoreVector,
     manifest: SplitManifest,
-    plan: LocationPlan,
+    plan: ProbeSettings,
     model_id: str,
     condition: str,
     control: str,

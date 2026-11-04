@@ -67,6 +67,7 @@ select = ["E", "F", "I", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/come_a_little_bit_closer/geometry/schemas.py" = ["F722", "F821"]
+"src/come_a_little_bit_closer/models/layer_schemas.py" = ["F722", "F821"]
 "src/come_a_little_bit_closer/projection/schemas.py" = ["F722", "F821"]
 "src/come_a_little_bit_closer/evaluation/location_schemas.py" = ["F722", "F821"]
 

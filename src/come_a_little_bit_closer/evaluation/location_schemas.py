@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -18,6 +19,11 @@ type BlockScores = Float64[np.ndarray, "blocks"]
 type ProbeWeights = Float64[np.ndarray, "features 3"]
 type ProbeTargets = Float64[np.ndarray, "samples 3"]
 type ProbeFeatures = Float64[np.ndarray, "samples features"]
+type SubsetTargets = Float64[np.ndarray, "subset 3"]
+type SubsetRidgeTargets = Float64[np.ndarray, "subset outputs"]
+type RidgeTargets = Float64[np.ndarray, "samples outputs"]
+type RidgeWeights = Float64[np.ndarray, "features outputs"]
+type PredictionDecoder = Callable[[RidgeTargets], ProbeTargets]
 type DocumentCondition = Literal["explicit-coordinates", "metadata-only"]
 type SplitName = Literal["train", "validation", "test"]
 
@@ -27,27 +33,30 @@ class ExperimentOrigin(BaseModel):
     coordinates: Coordinates
 
 
-class LocationPlan(BaseModel):
+class ProbeSettings(BaseModel):
+    split_seeds: list[int]
+    ridge_alphas: list[float]
+    block_degrees: float = Field(default=10, gt=0, le=90)
+    train_fraction: float = Field(default=0.6, gt=0, lt=1)
+    validation_fraction: float = Field(default=0.2, gt=0, lt=1)
+    bootstrap_replicates: int = Field(default=1000, gt=0)
+    bootstrap_seed: int = 1618
+    geometry: GeometrySettings = Field(default_factory=GeometrySettings)
+
+
+class LocationPlan(ProbeSettings):
     experiment_id: str
     model_ids: list[str]
     genres: list[str]
     genre_tags: dict[str, list[str]] = Field(default_factory=dict)
     minimum_genre_candidates: int = Field(default=1, gt=0)
     origins: list[ExperimentOrigin]
-    split_seeds: list[int]
-    ridge_alphas: list[float]
-    block_degrees: float = Field(default=10, gt=0, le=90)
-    train_fraction: float = Field(default=0.6, gt=0, lt=1)
-    validation_fraction: float = Field(default=0.2, gt=0, lt=1)
     neighbors: int = Field(default=10, gt=0)
-    bootstrap_replicates: int = Field(default=1000, gt=0)
-    bootstrap_seed: int = 1618
     batch_size: int = Field(default=32, gt=0)
     artifact_directory: Path = Path("data/processed/location-v1")
     metadata_directory: Path | None = None
     taxonomy_manifest: Path | None = None
     output_directory: Path = Path("outputs/location-v1")
-    geometry: GeometrySettings = Field(default_factory=GeometrySettings)
 
 
 class StationSplit(BaseModel):
@@ -92,6 +101,14 @@ class RidgeModel:
     feature_mean: Float64[np.ndarray, "features"]
     target_mean: Float64[np.ndarray, "3"]
     weights: ProbeWeights
+    alpha: float
+
+
+@dataclass(frozen=True)
+class TargetRidgeModel:
+    feature_mean: Float64[np.ndarray, "features"]
+    target_mean: Float64[np.ndarray, "outputs"]
+    weights: RidgeWeights
     alpha: float
 
 
