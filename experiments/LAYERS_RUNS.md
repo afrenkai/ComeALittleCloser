@@ -1,6 +1,6 @@
 # Layerwise probe dev run record
 
-All runs used BC Andromeda (Slurm), partition `gtml` unless noted. `gtml` rejects CPU-only submissions, so probe jobs, which need only CPUs, each held one L4 GPU (`--gres=gpu:l4:1 --cpus-per-task=12`). Two jobs were submitted to `short` and cancelled while pending (more than 10 minutes). Only `dev` mode has been run; **`final` mode has not been run**, and no held-out test results exist.
+All runs used BC Andromeda (Slurm), partition `gtml` unless noted. `gtml` rejects CPU-only submissions, so probe jobs, which need only CPUs, each held one L4 GPU (`--gres=gpu:l4:1 --cpus-per-task=12`). Two jobs were submitted to `short` and cancelled while pending (more than 10 minutes). `final` mode was run once, under `layers-v7` on 2026-11-04 (section at the end; results in `experiments/LAYERS_V7_CLAIMS.md`). Statements below that `final` "has not been run" describe the state when each section was written.
 
 Plan: `experiments/layers-v1.json`. Two plan hashes apply, both verified from git (`git show cc497ec~1:experiments/layers-v1.json | sha256sum` and `git show cc497ec:experiments/layers-v1.json | sha256sum`):
 
@@ -102,7 +102,7 @@ Cities, name-country text, mean pooling, probe. Gain is seed-mean km over the co
 
 Observations limited to what the table shows: on the random-item split every best-layer gain is negative, with CIs excluding zero. On the spatial-block split best-layer gains are positive for qwen3-0.6b-base (CI crosses zero), qwen3-0.6b-embedding (crosses zero), qwen3-4b-base (CI above zero), qwen3-4b-embedding (CI crosses zero), and bge-m3-unsupervised (about 5 km, CI crosses zero); all others are negative. Final-layer gains are lower than best-layer gains for every row where the two layers differ. Cities name-only and stations rows are in `outputs/layers-v1/dev/report/summary.md` (best layer over pooling and layer) and in the JSONL files. The best layer in `summary.md` is chosen over both pooling and layer, so it can differ from the mean-pooling rows above.
 
-## Before running final
+## Before running final (written before the test; completed under layers-v7)
 
 1. Freeze the final cells (model, dataset, condition, pooling, layer) in both `experiments/layers-v1.json` `final_cells` and this file.
 2. Record the resulting plan SHA-256 here.
