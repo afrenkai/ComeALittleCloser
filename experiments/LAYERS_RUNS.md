@@ -182,7 +182,24 @@ Jobs (submitted 2026-11-03):
 | 3297459 | e5-mistral extraction, batch 8, L40S | Completed | 17:45 | grs001 |
 | 3297460 | gemma2-9b-base extraction, batch 8, L40S | Completed | 21:37 | grs001 |
 | 3297461 | bge-multilingual-gemma2 extraction, batch 8, L40S | Completed | 20:43 | grs001 |
-| 3297462-3297475 | dev probes for the 14 earlier models (qwen3-8b-base, qwen3-8b-embedding, qwen3-4b-base, qwen3-4b-embedding, qwen3-0.6b-base, qwen3-0.6b-embedding, qwen3-0.6b-random, xlmr-large, bge-m3-retromae, bge-m3-unsupervised, bge-m3, xlmr-base, xlmr-base-random, e5-base, in job-ID order) | 12 completed by 13:17, byte-identical to layers-v3; the two 8B jobs running | | grs002 |
-| 3297476-3297479 | dev probes for mistral-7b-base, e5-mistral, gemma2-9b-base, bge-multilingual-gemma2 | running or pending | | grs002 |
+| 3297462-3297475 | dev probes for the 14 earlier models (qwen3-8b-base, qwen3-8b-embedding, qwen3-4b-base, qwen3-4b-embedding, qwen3-0.6b-base, qwen3-0.6b-embedding, qwen3-0.6b-random, xlmr-large, bge-m3-retromae, bge-m3-unsupervised, bge-m3, xlmr-base, xlmr-base-random, e5-base, in job-ID order) | All completed (8B pair 7:54 and 8:11; others 0:04 to 1:30). All 14 JSONL files are byte-identical to layers-v3 | | grs002 |
+| 3297476 | mistral-7b-base dev probe | Completed | 7:38:41 | grs002 |
+| 3297477 | e5-mistral dev probe | Completed | 7:37:47 | grs002 |
+| 3297478 | gemma2-9b-base dev probe (pending on Resources until 17:28) | Completed | 3:59:49 | grs002 |
+| 3297479 | bge-multilingual-gemma2 dev probe | Completed | 4:13:11 | grs002 |
+| 3306020 | dev report (`layer_report --config experiments/layers-v4.json --mode dev`), 8 CPUs, 48 GB | Completed | 1:11 | grs002 |
 
-Extracted features: about 41 GB per Mistral model and 47 GB per Gemma model. Results will be appended after the runs.
+Extracted features: about 41 GB per Mistral model and 47 GB per Gemma model. The report (all 18 models present) is in `outputs/layers-v4/dev/report/`; the figures and `summary.md` are copied to `docs/figures/layers-v4/`.
+
+### Dev-mode results for the new pairs
+
+Country-residual gain over the country centroid (km, best layer by gain, seed mean, [95% CI]; validation):
+
+| Model | cities name-country, random-item | cities name-country, spatial-block | stations, random-item | stations, spatial-block |
+| --- | --- | --- | --- | --- |
+| mistral-7b-base | 248 [170, 334] | 270 [131, 437] | 155 [68, 253] | 296 [78, 579] |
+| e5-mistral | 304 [218, 400] | 290 [158, 445] | 249 [125, 404] | 448 [139, 865] |
+| gemma2-9b-base | 303 [214, 405] | 321 [170, 500] | 169 [85, 261] | 304 [57, 638] |
+| bge-multilingual-gemma2 | 285 [203, 375] | 307 [169, 467] | 185 [80, 311] | 330 [70, 680] |
+
+Observations limited to the tables: both new families show within-country geography larger than Qwen3-8B (175 base, 201 retrieval on cities name-country random-item). The retrieval model is above its base in every Mistral cell and in the Gemma stations cells, and 14-18 km below its base in the Gemma cities name-country cells; every base/retrieval CI pair overlaps, so the result is "retrieval training keeps it" for both families, as for Qwen3. Absolute `sphere` probes (best layer over pooling, cities name-country, random-item) are above the country centroid for all four, with the CI crossing zero only for mistral-7b-base: mistral-7b-base 155 [-37, 397], e5-mistral 423 [201, 689], gemma2-9b-base 349 [127, 607], bge-multilingual-gemma2 459 [246, 713]. On stations random-item, no `sphere` probe of the four beats the centroid (e5-mistral -24 [-280, 271], bge-multilingual-gemma2 -169 [-445, 115]; both bases below with CIs under zero). Latitude/longitude R-squared for both families sits near the country-centroid line at every layer, without the Qwen3-4B-Embedding instability.

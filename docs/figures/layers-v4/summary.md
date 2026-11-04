@@ -1,6 +1,6 @@
 # Layerwise probe summary (dev mode)
 
-All numbers are **validation (dev-mode) results** from the `layers-v3` plan; they are not held-out test results. Best layer = maximal seed-mean gain over the country-centroid control (over pooling and layer), chosen on the same validation items, so gains are optimistic. CIs are seed-means of 95% block-bootstrap bounds.
+All numbers are **validation (dev-mode) results** from the `layers-v4` plan; they are not held-out test results. Best layer = maximal seed-mean gain over the country-centroid control (over pooling and layer), chosen on the same validation items, so gains are optimistic. CIs are seed-means of 95% block-bootstrap bounds.
 
 ## Models and revisions
 
@@ -9,7 +9,11 @@ All numbers are **validation (dev-mode) results** from the `layers-v3` plan; the
 | bge-m3 | xlmr-large | retrieval | BAAI/bge-m3 | 5617a9f61b028005a4858fdac845db406aefb181 |
 | bge-m3-retromae | xlmr-large | long-context pretraining | BAAI/bge-m3-retromae | 95c4f81ef8f7911dcac8e384532489c32c8dea64 |
 | bge-m3-unsupervised | xlmr-large | unsupervised contrastive | BAAI/bge-m3-unsupervised | 46f03bc86361cf88102b0b517b36c8259f2946b1 |
+| bge-multilingual-gemma2 | gemma2-9b | retrieval | BAAI/bge-multilingual-gemma2 | 8365500e19bc804136f4ad12c2494430239a2d72 |
 | e5-base | xlmr-base | retrieval | intfloat/multilingual-e5-base | d128750597153bb5987e10b1c3493a34e5a4502a |
+| e5-mistral | mistral-7b | retrieval | intfloat/e5-mistral-7b-instruct | d62cc4417be0e3289c03dd459d1ef2d137e2554e |
+| gemma2-9b-base | gemma2-9b | base | google/gemma-2-9b | 33c193028431c2fde6c6e51f29e6f17b60cbfac6 |
+| mistral-7b-base | mistral-7b | base | mistralai/Mistral-7B-v0.1 | 27d67f1b5f57dc0953326b2601d68371d40ea8da |
 | qwen3-0.6b-base | qwen3-0.6b | base | Qwen/Qwen3-0.6B-Base | da87bfb608c14b7cf20ba1ce41287e8de496c0cd |
 | qwen3-0.6b-embedding | qwen3-0.6b | retrieval | Qwen/Qwen3-Embedding-0.6B | 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3 |
 | qwen3-0.6b-random | qwen3-0.6b | random | Qwen/Qwen3-0.6B-Base | da87bfb608c14b7cf20ba1ce41287e8de496c0cd (random init) |
@@ -27,6 +31,10 @@ Errors are block-mean km (lower is better). Probe and permuted-labels errors are
 
 | model | dataset | condition | split | pooling | layer | rel. depth | gain over country (km) [CI] | probe km | permuted-labels km | country-centroid km |
 |---|---|---|---|---|---|---|---|---|---|---|
+| gemma2-9b-base | cities | name | random-item | last | 42 | 1.00 | -1,165 [-1,526, -812] | 2,362 | 7,326 | 1,197 |
+| bge-multilingual-gemma2 | cities | name | random-item | last | 32 | 0.76 | -863 [-1,209, -529] | 2,060 | 7,353 | 1,197 |
+| mistral-7b-base | cities | name | random-item | mean | 17 | 0.53 | -1,491 [-1,833, -1,160] | 2,689 | 7,287 | 1,197 |
+| e5-mistral | cities | name | random-item | last | 22 | 0.69 | -978 [-1,336, -623] | 2,176 | 7,294 | 1,197 |
 | qwen3-0.6b-random | cities | name | random-item | mean | 0 | 0.00 | -4,938 [-5,421, -4,458] | 6,135 | 7,293 | 1,197 |
 | qwen3-0.6b-base | cities | name | random-item | mean | 18 | 0.64 | -3,186 [-3,662, -2,739] | 4,383 | 7,299 | 1,197 |
 | qwen3-0.6b-embedding | cities | name | random-item | last | 23 | 0.82 | -3,200 [-3,692, -2,752] | 4,397 | 7,302 | 1,197 |
@@ -41,6 +49,10 @@ Errors are block-mean km (lower is better). Probe and permuted-labels errors are
 | bge-m3-retromae | cities | name | random-item | mean | 6 | 0.25 | -3,831 [-4,349, -3,338] | 5,028 | 7,292 | 1,197 |
 | bge-m3-unsupervised | cities | name | random-item | mean | 24 | 1.00 | -3,665 [-4,199, -3,182] | 4,862 | 7,289 | 1,197 |
 | bge-m3 | cities | name | random-item | mean | 12 | 0.50 | -3,693 [-4,211, -3,209] | 4,890 | 7,294 | 1,197 |
+| gemma2-9b-base | cities | name | spatial-block | mean | 26 | 0.62 | -346 [-1,190, 562] | 3,264 | 7,868 | 2,918 |
+| bge-multilingual-gemma2 | cities | name | spatial-block | last | 31 | 0.74 | -132 [-1,078, 807] | 3,050 | 7,899 | 2,918 |
+| mistral-7b-base | cities | name | spatial-block | last | 20 | 0.62 | -606 [-1,484, 310] | 3,524 | 7,864 | 2,918 |
+| e5-mistral | cities | name | spatial-block | last | 24 | 0.75 | -290 [-1,339, 830] | 3,208 | 7,860 | 2,918 |
 | qwen3-0.6b-random | cities | name | spatial-block | mean | 0 | 0.00 | -4,083 [-5,127, -3,120] | 7,001 | 7,860 | 2,918 |
 | qwen3-0.6b-base | cities | name | spatial-block | mean | 21 | 0.75 | -2,405 [-3,394, -1,483] | 5,323 | 7,862 | 2,918 |
 | qwen3-0.6b-embedding | cities | name | spatial-block | last | 23 | 0.82 | -2,464 [-3,432, -1,560] | 5,382 | 7,877 | 2,918 |
@@ -55,6 +67,10 @@ Errors are block-mean km (lower is better). Probe and permuted-labels errors are
 | bge-m3-retromae | cities | name | spatial-block | mean | 6 | 0.25 | -3,219 [-4,251, -2,273] | 6,136 | 7,869 | 2,918 |
 | bge-m3-unsupervised | cities | name | spatial-block | mean | 24 | 1.00 | -3,028 [-4,026, -2,117] | 5,946 | 7,839 | 2,918 |
 | bge-m3 | cities | name | spatial-block | mean | 24 | 1.00 | -3,082 [-4,092, -2,143] | 6,000 | 7,853 | 2,918 |
+| gemma2-9b-base | cities | name-country | random-item | last | 42 | 1.00 | 349 [127, 607] | 848 | 7,339 | 1,197 |
+| bge-multilingual-gemma2 | cities | name-country | random-item | last | 32 | 0.76 | 459 [246, 713] | 738 | 7,365 | 1,197 |
+| mistral-7b-base | cities | name-country | random-item | last | 28 | 0.88 | 155 [-37, 397] | 1,042 | 7,292 | 1,197 |
+| e5-mistral | cities | name-country | random-item | last | 23 | 0.72 | 423 [201, 689] | 774 | 7,295 | 1,197 |
 | qwen3-0.6b-random | cities | name-country | random-item | mean | 0 | 0.00 | -1,441 [-1,790, -1,158] | 2,638 | 7,291 | 1,197 |
 | qwen3-0.6b-base | cities | name-country | random-item | last | 8 | 0.29 | -533 [-755, -319] | 1,730 | 7,293 | 1,197 |
 | qwen3-0.6b-embedding | cities | name-country | random-item | last | 21 | 0.75 | -162 [-363, 57] | 1,359 | 7,345 | 1,197 |
@@ -69,6 +85,10 @@ Errors are block-mean km (lower is better). Probe and permuted-labels errors are
 | bge-m3-retromae | cities | name-country | random-item | mean | 24 | 1.00 | -993 [-1,299, -750] | 2,190 | 7,289 | 1,197 |
 | bge-m3-unsupervised | cities | name-country | random-item | mean | 23 | 0.96 | -547 [-800, -311] | 1,745 | 7,293 | 1,197 |
 | bge-m3 | cities | name-country | random-item | mean | 22 | 0.92 | -682 [-951, -447] | 1,879 | 7,294 | 1,197 |
+| gemma2-9b-base | cities | name-country | spatial-block | last | 40 | 0.95 | 1,494 [674, 2,454] | 1,424 | 7,871 | 2,918 |
+| bge-multilingual-gemma2 | cities | name-country | spatial-block | last | 32 | 0.76 | 1,705 [867, 2,706] | 1,213 | 7,855 | 2,918 |
+| mistral-7b-base | cities | name-country | spatial-block | last | 22 | 0.69 | 1,342 [537, 2,272] | 1,576 | 7,827 | 2,918 |
+| e5-mistral | cities | name-country | spatial-block | last | 23 | 0.72 | 1,739 [788, 2,814] | 1,179 | 7,830 | 2,918 |
 | qwen3-0.6b-random | cities | name-country | spatial-block | mean | 0 | 0.00 | -1,206 [-1,756, -670] | 4,124 | 7,868 | 2,918 |
 | qwen3-0.6b-base | cities | name-country | spatial-block | mean | 15 | 0.54 | 128 [-470, 803] | 2,790 | 7,861 | 2,918 |
 | qwen3-0.6b-embedding | cities | name-country | spatial-block | last | 22 | 0.79 | 943 [263, 1,735] | 1,975 | 7,864 | 2,918 |
@@ -83,6 +103,10 @@ Errors are block-mean km (lower is better). Probe and permuted-labels errors are
 | bge-m3-retromae | cities | name-country | spatial-block | mean | 24 | 1.00 | -696 [-1,310, -117] | 3,614 | 7,869 | 2,918 |
 | bge-m3-unsupervised | cities | name-country | spatial-block | mean | 24 | 1.00 | 5 [-467, 587] | 2,913 | 7,860 | 2,918 |
 | bge-m3 | cities | name-country | spatial-block | mean | 22 | 0.92 | -194 [-732, 387] | 3,112 | 7,847 | 2,918 |
+| gemma2-9b-base | stations | metadata | random-item | last | 41 | 0.98 | -511 [-863, -161] | 2,173 | 7,855 | 1,662 |
+| bge-multilingual-gemma2 | stations | metadata | random-item | last | 38 | 0.90 | -169 [-445, 115] | 1,831 | 7,881 | 1,662 |
+| mistral-7b-base | stations | metadata | random-item | mean | 16 | 0.50 | -577 [-880, -247] | 2,240 | 7,812 | 1,662 |
+| e5-mistral | stations | metadata | random-item | last | 25 | 0.78 | -24 [-280, 271] | 1,686 | 7,802 | 1,662 |
 | qwen3-0.6b-random | stations | metadata | random-item | mean | 0 | 0.00 | -2,262 [-2,728, -1,828] | 3,924 | 7,810 | 1,662 |
 | qwen3-0.6b-base | stations | metadata | random-item | mean | 21 | 0.75 | -1,629 [-2,030, -1,254] | 3,291 | 7,821 | 1,662 |
 | qwen3-0.6b-embedding | stations | metadata | random-item | last | 23 | 0.82 | -1,283 [-1,629, -944] | 2,945 | 7,818 | 1,662 |
@@ -97,6 +121,10 @@ Errors are block-mean km (lower is better). Probe and permuted-labels errors are
 | bge-m3-retromae | stations | metadata | random-item | mean | 0 | 0.00 | -1,768 [-2,196, -1,365] | 3,431 | 7,794 | 1,662 |
 | bge-m3-unsupervised | stations | metadata | random-item | mean | 0 | 0.00 | -1,766 [-2,199, -1,359] | 3,428 | 7,795 | 1,662 |
 | bge-m3 | stations | metadata | random-item | mean | 23 | 0.96 | -1,751 [-2,143, -1,369] | 3,414 | 7,806 | 1,662 |
+| gemma2-9b-base | stations | metadata | spatial-block | last | 41 | 0.98 | 850 [122, 1,636] | 3,110 | 8,201 | 3,960 |
+| bge-multilingual-gemma2 | stations | metadata | spatial-block | last | 30 | 0.71 | 1,052 [385, 1,780] | 2,908 | 8,222 | 3,960 |
+| mistral-7b-base | stations | metadata | spatial-block | mean | 9 | 0.28 | 742 [-13, 1,556] | 3,218 | 8,149 | 3,960 |
+| e5-mistral | stations | metadata | spatial-block | last | 19 | 0.59 | 1,094 [338, 1,890] | 2,866 | 8,094 | 3,960 |
 | qwen3-0.6b-random | stations | metadata | spatial-block | mean | 0 | 0.00 | -1,002 [-1,758, -239] | 4,962 | 8,171 | 3,960 |
 | qwen3-0.6b-base | stations | metadata | spatial-block | mean | 21 | 0.75 | -138 [-855, 605] | 4,097 | 8,126 | 3,960 |
 | qwen3-0.6b-embedding | stations | metadata | spatial-block | mean | 24 | 0.86 | 156 [-602, 983] | 3,804 | 8,137 | 3,960 |
@@ -121,7 +149,11 @@ All values are validation (dev) results, seed means, with the best layer chosen 
 | bge-m3 | cities | name | random-item | 24 | 0 [-0, 1] † | 15 | 0.384 | 0.584 | 0.953 | 0.981 |
 | bge-m3-retromae | cities | name | random-item | 1 | 0 [-0, 0] † | 21 | 0.356 | 0.539 | 0.953 | 0.981 |
 | bge-m3-unsupervised | cities | name | random-item | 1 | 0 [-0, 0] † | 22 | 0.396 | 0.586 | 0.953 | 0.981 |
+| bge-multilingual-gemma2 | cities | name | random-item | 33 | 226 [158, 305] † | 32 | 0.786 | 0.843 | 0.953 | 0.981 |
 | e5-base | cities | name | random-item | 1 | 0 [-3, 4] † | 11 | 0.440 | 0.617 | 0.953 | 0.981 |
+| e5-mistral | cities | name | random-item | 25 | 230 [150, 322] † | 22 | 0.766 | 0.832 | 0.953 | 0.981 |
+| gemma2-9b-base | cities | name | random-item | 33 | 191 [124, 271] † | 30 | 0.759 | 0.828 | 0.953 | 0.981 |
+| mistral-7b-base | cities | name | random-item | 22 | 127 [68, 197] † | 25 | 0.718 | 0.801 | 0.953 | 0.981 |
 | qwen3-0.6b-base | cities | name | random-item | 22 | 2 [-7, 12] † | 18 | 0.452 | 0.641 | 0.953 | 0.981 |
 | qwen3-0.6b-embedding | cities | name | random-item | 24 | 7 [-7, 21] † | 23 | 0.451 | 0.637 | 0.953 | 0.981 |
 | qwen3-0.6b-random | cities | name | random-item | 1 | 0 [-0, 1] † | 0 | 0.126 | 0.287 | 0.953 | 0.981 |
@@ -135,7 +167,11 @@ All values are validation (dev) results, seed means, with the best layer chosen 
 | bge-m3 | cities | name | spatial-block | 16 | 8 [-13, 33] † | 17 | 0.294 | 0.546 | 0.864 | 0.914 |
 | bge-m3-retromae | cities | name | spatial-block | 19 | 9 [-6, 25] † | 13 | 0.274 | 0.506 | 0.864 | 0.914 |
 | bge-m3-unsupervised | cities | name | spatial-block | 16 | 8 [-14, 34] † | 22 | 0.307 | 0.547 | 0.864 | 0.914 |
+| bge-multilingual-gemma2 | cities | name | spatial-block | 32 | 223 [113, 361] † | 30 | 0.704 | 0.802 | 0.864 | 0.914 |
 | e5-base | cities | name | spatial-block | 6 | 12 [-9, 37] † | 11 | 0.347 | 0.587 | 0.864 | 0.914 |
+| e5-mistral | cities | name | spatial-block | 25 | 222 [104, 378] † | 20 | 0.657 | 0.780 | 0.864 | 0.914 |
+| gemma2-9b-base | cities | name | spatial-block | 26 | 235 [114, 385] † | 18 | 0.685 | 0.789 | 0.864 | 0.914 |
+| mistral-7b-base | cities | name | spatial-block | 22 | 171 [61, 306] † | 19 | 0.636 | 0.753 | 0.864 | 0.914 |
 | qwen3-0.6b-base | cities | name | spatial-block | 13 | 20 [-10, 53] † | 19 | 0.374 | 0.608 | 0.864 | 0.914 |
 | qwen3-0.6b-embedding | cities | name | spatial-block | 23 | 35 [1, 77] † | 21 | 0.367 | 0.596 | 0.864 | 0.914 |
 | qwen3-0.6b-random | cities | name | spatial-block | 2 | 6 [-7, 20] † | 0 | 0.044 | 0.237 | 0.864 | 0.914 |
@@ -149,7 +185,11 @@ All values are validation (dev) results, seed means, with the best layer chosen 
 | bge-m3 | cities | name-country | random-item | 16 | 11 [-8, 32] | 23 | 0.892 | 0.931 | 0.953 | 0.981 |
 | bge-m3-retromae | cities | name-country | random-item | 16 | 2 [-7, 11] | 24 | 0.843 | 0.906 | 0.953 | 0.981 |
 | bge-m3-unsupervised | cities | name-country | random-item | 16 | 14 [-5, 36] | 23 | 0.908 | 0.946 | 0.953 | 0.981 |
+| bge-multilingual-gemma2 | cities | name-country | random-item | 32 | 285 [203, 375] | 32 | 0.972 | 0.982 | 0.953 | 0.981 |
 | e5-base | cities | name-country | random-item | 8 | 3 [-13, 21] | 12 | 0.887 | 0.934 | 0.953 | 0.981 |
+| e5-mistral | cities | name-country | random-item | 25 | 304 [218, 400] | 22 | 0.966 | 0.979 | 0.953 | 0.981 |
+| gemma2-9b-base | cities | name-country | random-item | 42 | 303 [214, 405] | 41 | 0.964 | 0.977 | 0.953 | 0.981 |
+| mistral-7b-base | cities | name-country | random-item | 27 | 248 [170, 334] | 9 | 0.954 | 0.972 | 0.953 | 0.981 |
 | qwen3-0.6b-base | cities | name-country | random-item | 24 | 12 [-6, 31] | 8 | 0.906 | 0.943 | 0.953 | 0.981 |
 | qwen3-0.6b-embedding | cities | name-country | random-item | 24 | 24 [1, 48] | 23 | 0.939 | 0.961 | 0.953 | 0.981 |
 | qwen3-0.6b-random | cities | name-country | random-item | 1 | 1 [-1, 2] | 0 | 0.782 | 0.870 | 0.953 | 0.981 |
@@ -163,7 +203,11 @@ All values are validation (dev) results, seed means, with the best layer chosen 
 | bge-m3 | cities | name-country | spatial-block | 18 | 21 [-9, 54] | 24 | 0.828 | 0.901 | 0.864 | 0.914 |
 | bge-m3-retromae | cities | name-country | spatial-block | 6 | 6 [-1, 13] | 19 | 0.767 | 0.870 | 0.864 | 0.914 |
 | bge-m3-unsupervised | cities | name-country | spatial-block | 19 | 26 [-11, 67] | 24 | 0.838 | 0.912 | 0.864 | 0.914 |
+| bge-multilingual-gemma2 | cities | name-country | spatial-block | 32 | 307 [169, 467] | 33 | 0.954 | 0.963 | 0.864 | 0.914 |
 | e5-base | cities | name-country | spatial-block | 8 | 31 [-2, 72] | 12 | 0.838 | 0.910 | 0.864 | 0.914 |
+| e5-mistral | cities | name-country | spatial-block | 22 | 290 [158, 445] | 20 | 0.923 | 0.948 | 0.864 | 0.914 |
+| gemma2-9b-base | cities | name-country | spatial-block | 30 | 321 [170, 500] | 30 | 0.935 | 0.954 | 0.864 | 0.914 |
+| mistral-7b-base | cities | name-country | spatial-block | 22 | 270 [131, 437] | 20 | 0.915 | 0.945 | 0.864 | 0.914 |
 | qwen3-0.6b-base | cities | name-country | spatial-block | 28 | 48 [8, 94] | 8 | 0.866 | 0.912 | 0.864 | 0.914 |
 | qwen3-0.6b-embedding | cities | name-country | spatial-block | 22 | 48 [2, 100] | 23 | 0.906 | 0.939 | 0.864 | 0.914 |
 | qwen3-0.6b-random | cities | name-country | spatial-block | 4 | 4 [-4, 12] | 0 | 0.666 | 0.808 | 0.864 | 0.914 |
@@ -177,7 +221,11 @@ All values are validation (dev) results, seed means, with the best layer chosen 
 | bge-m3 | stations | metadata | random-item | 0 | 27 [-32, 103] | 24 | 0.686 | 0.802 | 0.923 | 0.956 |
 | bge-m3-retromae | stations | metadata | random-item | 0 | 27 [-31, 102] | 0 | 0.682 | 0.760 | 0.923 | 0.956 |
 | bge-m3-unsupervised | stations | metadata | random-item | 0 | 27 [-31, 103] | 24 | 0.669 | 0.790 | 0.923 | 0.956 |
+| bge-multilingual-gemma2 | stations | metadata | random-item | 32 | 185 [80, 311] | 32 | 0.903 | 0.919 | 0.923 | 0.956 |
 | e5-base | stations | metadata | random-item | 0 | 13 [-35, 70] | 12 | 0.706 | 0.798 | 0.923 | 0.956 |
+| e5-mistral | stations | metadata | random-item | 26 | 249 [125, 404] | 25 | 0.916 | 0.928 | 0.923 | 0.956 |
+| gemma2-9b-base | stations | metadata | random-item | 42 | 169 [85, 261] | 22 | 0.851 | 0.884 | 0.923 | 0.956 |
+| mistral-7b-base | stations | metadata | random-item | 26 | 155 [68, 253] | 31 | 0.833 | 0.876 | 0.923 | 0.956 |
 | qwen3-0.6b-base | stations | metadata | random-item | 28 | 32 [-11, 79] | 28 | 0.673 | 0.761 | 0.923 | 0.956 |
 | qwen3-0.6b-embedding | stations | metadata | random-item | 0 | 25 [-20, 81] | 21 | 0.741 | 0.805 | 0.923 | 0.956 |
 | qwen3-0.6b-random | stations | metadata | random-item | 0 | 12 [-17, 53] | 0 | 0.675 | 0.751 | 0.923 | 0.956 |
@@ -191,7 +239,11 @@ All values are validation (dev) results, seed means, with the best layer chosen 
 | bge-m3 | stations | metadata | spatial-block | 10 | 109 [-8, 262] | 24 | 0.548 | 0.657 | 0.052 | 0.727 |
 | bge-m3-retromae | stations | metadata | spatial-block | 3 | 121 [-3, 286] | 14 | 0.561 | 0.599 | 0.052 | 0.727 |
 | bge-m3-unsupervised | stations | metadata | spatial-block | 7 | 109 [-15, 276] | 24 | 0.551 | 0.652 | 0.052 | 0.727 |
+| bge-multilingual-gemma2 | stations | metadata | spatial-block | 30 | 330 [70, 680] | 28 | 0.776 | 0.788 | 0.052 | 0.727 |
 | e5-base | stations | metadata | spatial-block | 3 | 137 [18, 290] | 12 | 0.487 | 0.642 | 0.052 | 0.727 |
+| e5-mistral | stations | metadata | spatial-block | 28 | 448 [139, 865] | 21 | 0.749 | 0.846 | 0.052 | 0.727 |
+| gemma2-9b-base | stations | metadata | spatial-block | 41 | 304 [57, 638] | 22 | 0.753 | 0.778 | 0.052 | 0.727 |
+| mistral-7b-base | stations | metadata | spatial-block | 8 | 296 [78, 579] | 16 | 0.747 | 0.779 | 0.052 | 0.727 |
 | qwen3-0.6b-base | stations | metadata | spatial-block | 28 | 135 [18, 277] | 19 | 0.579 | 0.613 | 0.052 | 0.727 |
 | qwen3-0.6b-embedding | stations | metadata | spatial-block | 24 | 137 [1, 312] | 12 | 0.537 | 0.626 | 0.052 | 0.727 |
 | qwen3-0.6b-random | stations | metadata | spatial-block | 3 | 44 [-13, 102] | 0 | 0.441 | 0.580 | 0.052 | 0.727 |

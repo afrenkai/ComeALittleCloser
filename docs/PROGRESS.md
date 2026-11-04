@@ -2,7 +2,7 @@
 
 A plain-language summary of where the project stands, for the team. Technical run logs live in [`experiments/LAYERS_RUNS.md`](../experiments/LAYERS_RUNS.md); this page explains what they mean.
 
-**Short version.** We built a pipeline that measures, layer by layer, how much geographic information is inside a language model, and ran it on 14 models (4 more are running now). Larger decoder models know where a city lies *within its country*, not just which country it is in, and retrieval training (turning a base model into a search-embedding model) does **not** throw that information away. Encoder models (XLM-R, E5, BGE-M3) show almost none of it. All numbers so far are on the **validation** split; the held-out **test** split has not been touched yet (see "Before the test run" below).
+**Short version.** We built a pipeline that measures, layer by layer, how much geographic information is inside a language model, and ran it on 18 models. Larger decoder models know where a city lies *within its country*, not just which country it is in, and retrieval training (turning a base model into a search-embedding model) does **not** throw that information away. Encoder models (XLM-R, E5, BGE-M3) show almost none of it. All numbers so far are on the **validation** split; the held-out **test** split has not been touched yet (see "Before the test run" below).
 
 ## Where the code is
 
@@ -29,8 +29,8 @@ The proposal asked whether text embeddings encode geography, and whether retriev
   | Qwen3 0.6B | Qwen3-0.6B-Base (+ random-init control) | Qwen3-Embedding-0.6B | done |
   | Qwen3 4B | Qwen3-4B-Base | Qwen3-Embedding-4B | done |
   | Qwen3 8B | Qwen3-8B-Base | Qwen3-Embedding-8B | done |
-  | Mistral 7B | Mistral-7B-v0.1 | e5-mistral-7b-instruct | running |
-  | Gemma-2 9B | gemma-2-9b | bge-multilingual-gemma2 | running |
+  | Mistral 7B | Mistral-7B-v0.1 | e5-mistral-7b-instruct | done |
+  | Gemma-2 9B | gemma-2-9b | bge-multilingual-gemma2 | done |
   | XLM-R base | xlm-roberta-base (+ random-init control) | multilingual-e5-base | done |
   | XLM-R large | xlm-roberta-large | BGE-M3 (three training stages: RetroMAE, unsupervised, final) | done |
 
@@ -45,7 +45,7 @@ The proposal asked whether text embeddings encode geography, and whether retriev
 
 ## Results so far (validation only)
 
-### 1. Within-country geography grows with model size, and retrieval training keeps it
+### 1. Within-country geography appears in every large decoder, and retrieval training keeps it
 
 Country-residual probe, `name-country` cities, km gain over the country centroid at each model's best layer, [95% CI]:
 
@@ -54,68 +54,102 @@ Country-residual probe, `name-country` cities, km gain over the country centroid
 | Qwen3 0.6B | 12 [-6, 31] | 24 [1, 48] | 48 [8, 94] | 48 [2, 100] |
 | Qwen3 4B | 120 [68, 178] | 152 [90, 223] | 158 [73, 259] | 192 [83, 321] |
 | Qwen3 8B | 175 [110, 254] | 201 [128, 285] | 206 [97, 333] | 226 [102, 380] |
+| Mistral 7B → e5-mistral | 248 [170, 334] | 304 [218, 400] | 270 [131, 437] | 290 [158, 445] |
+| Gemma-2 9B → bge-multilingual-gemma2 | 303 [214, 405] | 285 [203, 375] | 321 [170, 500] | 307 [169, 467] |
 | XLM-R base → E5 | 1 [-2, 4] | 3 [-13, 21] | 19 [-4, 43] | 31 [-2, 72] |
 | XLM-R large → BGE-M3 | 1 [-3, 5] | 11 [-8, 32] | 8 [-19, 37] | 21 [-9, 54] |
 
-Random-init controls are at about 1–4 km. In every Qwen size the retrieval model is at or above its base, but the CIs overlap, so the safe claim is "retrieval training keeps it", not "improves it". The same pattern holds for radio stations (Qwen3-8B: 170 base, 179 retrieval, random-item) and for name-only text when the probe is told the country.
+Random-init controls are at about 1–4 km. The Mistral and Gemma pairs, added to test whether the Qwen pattern holds in other families, show the most within-country geography of all. In every Qwen size and for Mistral the retrieval model is at or above its base; for Gemma it is 14–18 km below. All base/retrieval CIs overlap, so the safe claim across all five decoder pairs is "retrieval training keeps it", not "improves it" or "removes it". The same pattern holds for radio stations (Qwen3-8B: 170 base, 179 retrieval, random-item) and for name-only text when the probe is told the country.
 
-![Residual gain by depth](figures/layers-v3/where-geography-dies-residual.png)
+![Residual gain by depth](figures/layers-v4/where-geography-dies-residual.png)
 
-**How to read it.** One panel per model family; x is relative depth (0 = embedding layer, 1 = last layer); y is km better than the country centroid; the band is the 95% CI. In Qwen3-4B and 8B the signal appears about a quarter of the way in and stays through the last layer. It is never discarded. XLM-R families stay flat at zero. (The title says "where geography dies" for historical reasons; the answer for decoders is "it doesn't".)
+**How to read it.** One panel per model family; x is relative depth (0 = embedding layer, 1 = last layer); y is km better than the country centroid; the band is the 95% CI. In Qwen3-4B, Qwen3-8B, Mistral-7B and Gemma-2-9B the signal appears in the first quarter to third of the network and stays through the last layer. It is never discarded. XLM-R families stay flat at zero. (The title says "where geography dies" for historical reasons; the answer for decoders is "it doesn't".)
 
 ### 2. The vector you actually search with carries geography
 
-Using the plain `sphere` probe on the retrieval models' own output vector (last token, last layer), Qwen3-Embedding-4B beats the country centroid by 231 km [30, 472] and Qwen3-Embedding-8B by 311 km [89, 565] (random-item). Mean-pooled `sphere` probes never beat the country centroid on random-item, which is why the earlier final-embedding experiments looked negative.
+Using the plain `sphere` probe on the retrieval models' own output vector (last token, last layer), Qwen3-Embedding-4B beats the country centroid by 231 km [30, 472] and Qwen3-Embedding-8B by 311 km [89, 565] (random-item); the best `sphere` probes on e5-mistral (423 km [201, 689]) and bge-multilingual-gemma2 (459 km [246, 713]) also beat it, at middle-to-late layers (23 of 32, 32 of 42). On stations no retrieval model's `sphere` probe beats the centroid. Mean-pooled `sphere` probes never beat the country centroid on random-item, which is why the earlier final-embedding experiments looked negative.
 
-![Sphere probe by depth, spatial-block split](figures/layers-v3/where-geography-dies.png)
-![Sphere probe by depth, random-item split](figures/layers-v3/where-geography-dies-random-item.png)
+![Sphere probe by depth, spatial-block split](figures/layers-v4/where-geography-dies.png)
+![Sphere probe by depth, random-item split](figures/layers-v4/where-geography-dies-random-item.png)
 
 ### 3. R² on latitude/longitude overstates what a model knows
 
-![R-squared by depth](figures/layers-v3/r2-by-depth.png)
+![R-squared by depth](figures/layers-v4/r2-by-depth.png)
 
 Gurnee & Tegmark report R² of probes onto latitude and longitude. When the text names the country, the country centroid alone reaches R² = 0.95 (latitude) / 0.98 (longitude), and a *randomly initialized* Qwen3-0.6B reaches 0.78 / 0.87, so high R² mostly reflects knowing the country. The dotted line in each panel is the country-centroid R². This is our main critique of that paper and why the country-residual probe is the headline measure.
 
 ### 4. Where the probe puts each city
 
-![Distortion map, Qwen3-8B](figures/layers-v3/distortion-qwen3-8b.png)
+![Distortion map, Qwen3-8B](figures/layers-v4/distortion-qwen3-8b.png)
 
 Grey dots are true city positions; arrows go from true to predicted position for 1,500 random validation cities (Qwen3-8B, layer 24). Base and retrieval models look very similar (median errors 842 km and 853 km). This is the prototype for the "distortion map" view in the interface.
 
 ### 5. BGE-M3 training stages
 
-![BGE-M3 stage trajectory](figures/layers-v3/stage-trajectory.png)
+![BGE-M3 stage trajectory](figures/layers-v4/stage-trajectory.png)
 
 Best-layer `sphere` gain at each BGE-M3 training stage. The unsupervised-contrastive stage gives the largest jump, but the CIs are wide and all stages stay at or below the country centroid.
 
-Full tables (every model, dataset, split, and probe) are in [`figures/layers-v3/summary.md`](figures/layers-v3/summary.md).
+Full tables (every model, dataset, split, and probe) are in [`figures/layers-v4/summary.md`](figures/layers-v4/summary.md).
 
 ## Caveats
 
 - **Validation numbers are optimistic.** The best layer and ridge strength are chosen on the same validation places they are scored on. The test run fixes this.
 - **The country-centroid baseline is weak on station spatial-block splits.** When a country's main region is held out, its training centroid can come from a few distant stations, so station spatial-block gains partly reflect fixing a broken baseline. `summary.md` reports coverage.
-- **Some Qwen3-4B-Embedding layers are unstable for the lat/lon probe.** In `r2-by-depth.png` a few middle layers dip sharply with large seed spread. This needs checking before we report lat/lon R² by layer.
+- **Some Qwen3-4B-Embedding layers are unstable for the lat/lon probe.** In `r2-by-depth.png` a few middle layers dip sharply with large seed spread (no other model does this, including the Mistral and Gemma pairs). This needs checking before we report lat/lon R² by layer.
 - **Probes show the information is decodable, not that the model uses it** for retrieval.
 
-## Running now
+## One plan for every result
 
-All 18 models are being rerun under one plan, `experiments/layers-v4.json`, so every result traces to the same configuration. This adds the Mistral-7B and Gemma-2-9B pairs, which test whether the Qwen pattern holds in other model families. Results are expected overnight; this page and its figures will be refreshed on 2026-11-04.
+All 18 models were probed under one plan, `experiments/layers-v4.json`, so every number on this page traces to the same configuration. The 14 earlier models reproduce their layers-v3 outputs byte for byte; layers-v4 adds the Mistral-7B and Gemma-2-9B pairs (finished 2026-11-03).
 
 ## Before the test run
 
-The test split can be used only once. Before running it, the team agrees on a short list of exactly which results the paper claims (model, dataset, text form, pooling, probe, layer), commits that list, and only then runs the test. A draft list will be circulated after the v4 results.
+The test split can be used only once. Before running it, the team agrees on a short list of exactly which results the paper claims (model, dataset, text form, pooling, probe, layer), commits that list, and only then runs the test. A draft list will be circulated next.
 
-## Next steps (proposed owners; see the project update)
+## How we got here (2026-11-02 to 2026-11-03)
+
+Each step was a new frozen plan, so earlier results stay reproducible; details and job IDs are in [`experiments/LAYERS_RUNS.md`](../experiments/LAYERS_RUNS.md).
+
+1. **layers-v1 (12 models, `sphere` probe only).** On the random-item split every model's best layer was *worse* than the country centroid. That looked like "no geography", the same as the earlier final-embedding experiments on `master`.
+2. **layers-v2 (same 12 models, two new probe targets).** We asked whether the probe or the models were the problem. The `country-residual` target (predict the offset from the country centre) showed real within-country signal in Qwen3-4B; the `latlon` target showed that R² near 0.95 is reachable by knowing the country alone, which became our critique of Gurnee & Tegmark.
+3. **layers-v3 (+ Qwen3-8B pair, 14 models).** Tested whether the signal grows with scale. It does (0.6B → 4B → 8B), and the 8B retrieval model's own output vector beats the country centroid by 311 km.
+4. **layers-v4 (+ Mistral-7B and Gemma-2-9B pairs, 18 models).** Tested whether the pattern is Qwen-specific. It is not: both families show the most within-country geography, and retrieval training keeps it. The 14 earlier models reproduce v3 byte for byte.
+
+Decisions made along the way:
+
+- **EmbeddingGemma is not in the probe study**: Google has not released the base it was trained from, so there is no before/after pair. It stays in the retrieval experiments.
+- **multilingual-e5-large was considered and dropped**: it would be a second retrieval model on the XLM-R-large base next to BGE-M3, and the report compares one retrieval model per family.
+- **Two extraction fixes for the new decoders** (commit `0c87d8b`): Mistral and Gemma need their start-of-text token (`<s>`, `<bos>`), which is prepended and excluded from pooling; Gemma-2 must use eager attention, because the default fast path skips its attention soft-capping. Qwen outputs are unchanged by both.
+- **The test split has not been touched.** Every number is validation.
+
+## The project update and its feedback
+
+The one-page update is [`paper/update/TeamN.tex`](../paper/update/TeamN.tex) (PDF next to it). We revised it against the course feedback and then against three rounds of mock grading (LLM reviewers: 9.0, 9.2, 9.0 out of 10). What changed: three linked views specified with interactions and signal-vs-noise rules (V1 globe ranking, V2 layer-by-region map, V3 distortion map), a sharper critique of Decoupes et al. and Gurnee & Tegmark, the three retrieval metrics and what each answers, a "decodable vs. reflected in retrieval" distinction, pre-stated case studies C1–C4, and a rebalanced plan. The remaining criticism is not about wording: **V2 and V3 are not built yet, and the new retrieval metrics have no numbers yet.** That is the main risk to the course grade.
+
+## Next steps (owners as proposed in the update; please confirm)
 
 | When | What | Owner |
 |---|---|---|
-| Nov 4–10 | Freeze the test list; run the held-out test once; export per-region scores | Tian-hao Zhang |
-| Nov 11–24 | Retrieval proximity metrics (Spearman ρ, overlap@10, excess distance, random baseline) | Nathan Chen |
-| Nov 11–24 | Layer-by-region map view, linked to the globe explorer | Artem Frenk |
-| Nov 25–Dec 6 | Case studies and expert walkthrough of the views | Kenta Ploch |
-| Dec 7–20 | Paper; audio and adapter only as stretch goals | everyone |
+| Nov 4–10 | Freeze the test list; run the held-out test once | Tian-hao Zhang |
+| Nov 4–10 | V2 skeleton on validation scores | Artem Frenk |
+| Nov 4–10 | Retrieval metrics code (Spearman ρ, overlap@10, excess km, random baseline) | Nathan Chen |
+| Nov 4–10 | V3 aggregation (per-block displacement, capital/country/continent pulls) | Kenta Ploch |
+| Nov 11–24 | Per-block test scores into V2/V3; coordinate perturbation | Tian-hao Zhang |
+| Nov 11–24 | Metrics on ~300 origins, border crossing, lexical and fusion baselines | Nathan Chen |
+| Nov 11–24 | V2 and V3 linked to V1 | Artem Frenk, Kenta Ploch |
+| Nov 25–Dec 6 | Case studies C1–C4 and expert walkthrough | Kenta Ploch (all help) |
+| Dec 7–20 | Paper; audio and adapter only if the core is done | everyone |
 
-The project update draft is in [`paper/update/TeamN.tex`](../paper/update/TeamN.tex).
+Fallback if V2 lags: static per-layer maps answer C1–C2.
+
+## Beyond the course: is this publishable?
+
+Honest assessment as of 2026-11-03: not yet a main-venue paper; a careful workshop paper (e.g. BlackboxNLP) is realistic after the test run.
+
+- **Solid:** within-country geography in every decoder from 4B up, replicated across three families; retrieval training keeps it in all five pairs; the R² critique with the random-init control.
+- **Weak spots a reviewer would hit:** probes show decodability, not use; validation numbers only; "encoders have none" is confounded with size (all encoders are 0.6B or smaller); cities are famous named entities, so some signal may be memorized facts.
+- **The strongest direction:** the retrieval vectors carry geography (probes beat the centroid by 311–459 km on cities), yet cosine retrieval is still ~3,700–4,100 km from the true nearest stations. Showing that gap per region (the decodable-vs-reflected analysis), and then testing a cheap fix (a small linear reweighting along the probe direction, close to the adapter in the proposal), would make a Findings-level paper if the fix works.
 
 ## Reproducing
 
