@@ -37,3 +37,7 @@ Small towns (1,000-4,999 people, not in `cities5000` or `cities15000`, unique te
 | 3362622 (array 0-2) | Small towns for e5-mistral, bge-multilingual-gemma2, qwen3-8b-embedding with `fix-v1.json` | Submitted | |
 | 3362623 (array 0-2) | Same with `fix-generic-v1-dev.json` | Submitted | |
 | 3362624 | harrier-27b on one H200 (`short`, 320 GB): parity, then all four extraction steps in sequence | Submitted | |
+| 3363090 (array 0-2) | Search features (documents, check and test queries; plain and geographic) for e5-mistral, bge-gemma2, qwen3-8b with `fix-v1.json` | Submitted | |
+| 3363091 (array 0-3) | Same for qwen3-4b, harrier-0.6b, octen-8b, nemotron-8b with `fix-v2-dev.json` | Submitted | |
+| 3363092 (array 0-5) | Web-search-instruction queries (`search-instruction-v1.json`) for the six runnable instruction models | Submitted | |
+| 3363093 | harrier-27b search features on one H200 | Submitted | |
