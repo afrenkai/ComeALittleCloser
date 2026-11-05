@@ -157,6 +157,10 @@ The fix is now `evaluation/geo_fix.py`, with instruction-conditioned extraction 
 | 3325419 | Check suite (ruff, black, pytest) at `69de7bd` | Completed, 74 passed | 0:28 |
 | 3325420 | **Final (test), run once**: `fix-v1.json` (SHA-256 verified `0e8267f5…cdd6ff2`), on `gtml`, `afterok:3325419`. `outputs/fix-v1` did not exist before submission | Completed. F1 supported (12/12, lowest CI bound +0.084); F2 supported (12/12, STS +0.013 to +0.028). Results: `experiments/FIX_V1_RESULTS.md` | 35:20 |
 
+Two details of fix-v1 that `docs/FIX_FREEZE.md` does not spell out:
+- **Fusion candidates.** These are the kept layers (every second layer of the upper half, plus the output), not every layer.
+- **Distance normalisation.** The distance probe's squared distances are divided by their mean over the set being scored (the evaluated cities, all stations, or the STS sentences). That uses no labels, but it is computed on the scored set, not on training cities. Both behaviours were fixed before the test run, and the code at the frozen commit is the reference. The paper's method section describes both.
+
 ## fix-baselines-v1: validation-only baselines and ablations (2026-11-04)
 
 These answer reviewer questions about fix-v1. Everything here is validation only: test cities and STS-B test are not read. `experiments/fix-generic-v1-dev.json` lists only the STS dev split, and extraction now encodes only the STS splits a plan lists. These are not frozen claims; the fix-v1 test is already used, so any new claim needs fresh held-out places.

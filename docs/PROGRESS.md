@@ -44,7 +44,7 @@ The proposal asked whether text embeddings encode geography, and whether retriev
   - `country-residual`: the offset from the country's centre. This asks "does the model know *where inside the country* this place is?" and is the most informative probe.
 - **Controls.** The baseline everywhere is the *country centroid*: predict the average location of training places from the same country. Gains are reported in km over that baseline (positive = better than knowing the country). Random-init models show what a probe can extract from tokenization alone; shuffled-label probes show chance level.
 - **Splits.** `random-item` holds out random places; `spatial-block` holds out whole 10° × 10° regions (harder: the probe must generalize to unseen parts of the map). Three seeds; 95% confidence intervals from a block bootstrap.
-- **Validation vs. test.** Places are split 60/20/20 into train/validation/test. Every number below is validation. The test split will be run exactly once, after we decide which results the paper claims (see below).
+- **Validation vs. test.** Places are split 60/20/20 into train/validation/test. Numbers in "Results so far" are validation; the test split was then run once, on frozen claims (see "Test results" below).
 
 ## Results so far (validation only)
 
@@ -165,7 +165,7 @@ Decisions made along the way:
 - **EmbeddingGemma is not in the probe study**: Google has not released the base it was trained from, so there is no before/after pair. It stays in the retrieval experiments.
 - **multilingual-e5-large was considered and dropped**: it would be a second retrieval model on the XLM-R-large base next to BGE-M3, and the report compares one retrieval model per family.
 - **Two extraction fixes for the new decoders** (commit `0c87d8b`): Mistral and Gemma need their start-of-text token (`<s>`, `<bos>`), which is prepended and excluded from pooling; Gemma-2 must use eager attention, because the default fast path skips its attention soft-capping. Qwen outputs are unchanged by both.
-- **The test split has not been touched.** Every number is validation.
+- **At that point the test split had not been touched**; every number was validation.
 
 ## The project update and its feedback
 
