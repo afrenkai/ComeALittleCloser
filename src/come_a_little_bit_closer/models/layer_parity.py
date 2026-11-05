@@ -1,4 +1,5 @@
 import argparse
+import gc
 from pathlib import Path
 
 import numpy as np
@@ -69,6 +70,9 @@ def check_parity(
     extractor = LayerExtractor(spec, device, 256)
     ours = unit_rows(extractor.extract(texts, 8)[pooling][-1].astype(np.float32))
     del extractor
+    gc.collect()
+    if device == "cuda":
+        torch.cuda.empty_cache()
     if saved_modules:
         reference = SentenceTransformer(
             spec.checkpoint,
