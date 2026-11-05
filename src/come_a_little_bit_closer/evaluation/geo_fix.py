@@ -11,6 +11,7 @@ from come_a_little_bit_closer.evaluation.fix_schemas import (
     FixMethod,
     FixPlan,
     FixScore,
+    FixTargets,
     ScoreMatrix,
     StsPairs,
     UnitMatrix,
@@ -37,6 +38,7 @@ from come_a_little_bit_closer.evaluation.layer_schemas import (
     CountryReflection,
     EvaluationMode,
     LayerPlan,
+    SplitKind,
 )
 from come_a_little_bit_closer.evaluation.location_prepare import plan_checksum
 from come_a_little_bit_closer.evaluation.probes import bootstrap_interval
@@ -234,23 +236,112 @@ def fit_fix(
     )
 
 
-def set_scores(
+def component_scores(
     array: np.ndarray, rows: np.ndarray | None, fitted: FittedFix, plan: FixPlan
-) -> tuple[ScoreMatrix, ScoreMatrix]:
-    """Plain cosine and the fused, distance-corrected score for one set of texts."""
+) -> dict[str, ScoreMatrix]:
+    """Cosine, layer fusion, distance probe, and both, for one set of texts."""
     output = unit(array[-1] if rows is None else array[-1][rows])
     middle_raw = array[fitted.layer] if rows is None else array[fitted.layer][rows]
     middle = centered_unit(unit(middle_raw), fitted.layer_center)
     cosine = output @ output.T
     fused = (cosine + plan.fusion_weight * middle @ middle.T) / (1 + plan.fusion_weight)
-    corrected = fused - plan.distance_weight * probe_distances(
+    distance = plan.distance_weight * probe_distances(
         output - fitted.output_center, fitted.probe
     )
-    return cosine, corrected
+    return {
+        "cosine": cosine,
+        "fusion": fused,
+        "probe": cosine - distance,
+        "fusion-probe": fused - distance,
+    }
 
 
 def sts_spearman(score: np.ndarray, pairs: StsPairs) -> float:
     return spearman(score[pairs.first, pairs.second], pairs.scores)
+
+
+def model_features(
+    plan: FixPlan, layers: LayerPlan, model_id: str, sts_collection: FixCollection
+) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], list[int]]:
+    """Plain and instructed last-token features on the instructed manifest's layers."""
+    plain_sts, sts_manifest = read_instructed(plan, model_id, sts_collection, False)
+    kept = sts_manifest.kept_layers
+    plain = {
+        "cities": np.asarray(
+            np.load(
+                feature_path(layers, model_id, "cities", "name-country", "last"),
+                mmap_mode="r",
+            )[kept]
+        ),
+        "stations": np.asarray(
+            np.load(
+                feature_path(layers, model_id, "stations", "metadata", "last"),
+                mmap_mode="r",
+            )[kept]
+        ),
+        "sts": plain_sts,
+    }
+    instructed_cities, city_manifest = read_instructed(
+        plan, model_id, "cities-name-country", True
+    )
+    if city_manifest.kept_layers != kept:
+        raise ValueError("Plain and instructed features keep different layers.")
+    instructed = {
+        "cities": instructed_cities,
+        "stations": read_instructed(plan, model_id, "stations-metadata", True)[0],
+        "sts": read_instructed(plan, model_id, sts_collection, True)[0],
+    }
+    return plain, instructed, kept
+
+
+def fix_score(
+    identity: tuple[str, EvaluationMode, SplitKind, int],
+    method: FixMethod,
+    scores: tuple[ScoreMatrix, ScoreMatrix, ScoreMatrix | None],
+    targets: FixTargets,
+    plan: FixPlan,
+    fusion_layer: int | None = None,
+    blend_weight: float | None = None,
+) -> FixScore:
+    """Judge one method's city, station and STS score matrices."""
+    model_id, mode, kind, seed = identity
+    city_score, station_score, sts_score = scores
+    city_countries = country_reflections(
+        city_score,
+        targets.city_truth,
+        targets.city_codes,
+        plan.minimum_cities,
+        plan.neighbors,
+    )
+    station_countries = country_reflections(
+        station_score,
+        targets.station_truth,
+        targets.station_codes,
+        plan.minimum_cities,
+        plan.neighbors,
+    )
+    return FixScore(
+        model_id=model_id,
+        mode=mode,
+        split_kind=kind,
+        seed=seed,
+        method=method,
+        fusion_layer=fusion_layer,
+        city_knn_gain=float(np.mean([row.knn_gain for row in city_countries])),
+        city_rho=float(np.mean([row.rho for row in city_countries])),
+        city_neighbor_km=neighbor_km(city_score, targets.city_truth, plan.neighbors),
+        station_knn_gain=float(np.mean([row.knn_gain for row in station_countries])),
+        station_rho=float(np.mean([row.rho for row in station_countries])),
+        station_neighbor_km=neighbor_km(
+            station_score, targets.station_truth, plan.neighbors
+        ),
+        genre_agreement=genre_agreement(station_score, targets.genres, plan.neighbors),
+        sts_spearman=(
+            None if sts_score is None else sts_spearman(sts_score, targets.sts)
+        ),
+        city_countries=city_countries,
+        blend_weight=blend_weight,
+    )
 
 
 def run_fix(config: Path, mode: EvaluationMode) -> Path:
@@ -279,41 +370,9 @@ def run_fix(config: Path, mode: EvaluationMode) -> Path:
     genres = station_genres(stations.texts)
     rows_written: list[FixScore] = []
     for model in plan.models:
-        plain_sts, sts_manifest = read_instructed(
-            plan, model.model_id, sts_collection, False
+        plain, instructed, kept = model_features(
+            plan, layers, model.model_id, sts_collection
         )
-        kept = sts_manifest.kept_layers
-        plain = {
-            "cities": np.asarray(
-                np.load(
-                    feature_path(
-                        layers, model.model_id, "cities", "name-country", "last"
-                    ),
-                    mmap_mode="r",
-                )[kept]
-            ),
-            "stations": np.asarray(
-                np.load(
-                    feature_path(
-                        layers, model.model_id, "stations", "metadata", "last"
-                    ),
-                    mmap_mode="r",
-                )[kept]
-            ),
-            "sts": plain_sts,
-        }
-        instructed_cities, city_manifest = read_instructed(
-            plan, model.model_id, "cities-name-country", True
-        )
-        if city_manifest.kept_layers != kept:
-            raise ValueError("Plain and instructed features keep different layers.")
-        instructed = {
-            "cities": instructed_cities,
-            "stations": read_instructed(
-                plan, model.model_id, "stations-metadata", True
-            )[0],
-            "sts": read_instructed(plan, model.model_id, sts_collection, True)[0],
-        }
         for kind in plan.split_kinds:
             for seed in layers.split_seeds:
                 split = build_split(
@@ -343,6 +402,15 @@ def run_fix(config: Path, mode: EvaluationMode) -> Path:
                 station_country = np.asarray(
                     [centroids.get(code, fallback) for code in station_codes]
                 )
+                targets = FixTargets(
+                    city_truth=city_truth[rows],
+                    city_codes=city_codes[rows],
+                    station_truth=station_truth,
+                    station_codes=station_codes,
+                    genres=genres,
+                    sts=sts,
+                )
+                identity = (model.model_id, mode, kind, seed)
                 scored = {}
                 fusion_layers = {}
                 for variant, arrays in [("plain", plain), ("instructed", instructed)]:
@@ -350,139 +418,82 @@ def run_fix(config: Path, mode: EvaluationMode) -> Path:
                         arrays["cities"], train_rows, city_truth, city_codes, plan, seed
                     )
                     scored[variant] = {
-                        "cities": set_scores(arrays["cities"], rows, fitted, plan),
-                        "stations": set_scores(arrays["stations"], None, fitted, plan),
-                        "sts": set_scores(arrays["sts"], None, fitted, plan),
+                        "cities": component_scores(
+                            arrays["cities"], rows, fitted, plan
+                        ),
+                        "stations": component_scores(
+                            arrays["stations"], None, fitted, plan
+                        ),
+                        "sts": component_scores(arrays["sts"], None, fitted, plan),
                     }
-                    fusion_layers[variant] = fitted.layer
-                city_cosine = scored["plain"]["cities"][0]
-                station_cosine = scored["plain"]["stations"][0]
-                methods: list[
-                    tuple[
-                        FixMethod,
-                        ScoreMatrix,
-                        ScoreMatrix,
-                        ScoreMatrix | None,
-                        int | None,
-                    ]
-                ] = [
-                    (
-                        "cosine",
-                        city_cosine,
-                        station_cosine,
-                        scored["plain"]["sts"][0],
-                        None,
-                    ),
-                    (
+                    fusion_layers[variant] = kept[fitted.layer]
+                city_cosine = scored["plain"]["cities"]["cosine"]
+                station_cosine = scored["plain"]["stations"]["cosine"]
+                rows_written += [
+                    fix_score(
+                        identity,
                         "country",
                         (
-                            city_cosine
-                            + plan.country_weight * city_country @ city_country.T
-                        )
-                        / (1 + plan.country_weight),
-                        (
-                            station_cosine
-                            + plan.country_weight * station_country @ station_country.T
-                        )
-                        / (1 + plan.country_weight),
-                        None,
-                        None,
+                            (
+                                city_cosine
+                                + plan.country_weight * city_country @ city_country.T
+                            )
+                            / (1 + plan.country_weight),
+                            (
+                                station_cosine
+                                + plan.country_weight
+                                * station_country
+                                @ station_country.T
+                            )
+                            / (1 + plan.country_weight),
+                            None,
+                        ),
+                        targets,
+                        plan,
                     ),
-                    (
+                    fix_score(
+                        identity,
                         "oracle",
                         (
-                            city_cosine
-                            + plan.oracle_weight * city_truth[rows] @ city_truth[rows].T
-                        )
-                        / (1 + plan.oracle_weight),
-                        (
-                            station_cosine
-                            + plan.oracle_weight * station_truth @ station_truth.T
-                        )
-                        / (1 + plan.oracle_weight),
-                        None,
-                        None,
-                    ),
-                    (
-                        "fusion-probe",
-                        scored["plain"]["cities"][1],
-                        scored["plain"]["stations"][1],
-                        scored["plain"]["sts"][1],
-                        kept[fusion_layers["plain"]],
-                    ),
-                    (
-                        "instruction",
-                        scored["instructed"]["cities"][0],
-                        scored["instructed"]["stations"][0],
-                        scored["instructed"]["sts"][0],
-                        None,
-                    ),
-                    (
-                        "instruction-fusion-probe",
-                        scored["instructed"]["cities"][1],
-                        scored["instructed"]["stations"][1],
-                        scored["instructed"]["sts"][1],
-                        kept[fusion_layers["instructed"]],
+                            (
+                                city_cosine
+                                + plan.oracle_weight
+                                * city_truth[rows]
+                                @ city_truth[rows].T
+                            )
+                            / (1 + plan.oracle_weight),
+                            (
+                                station_cosine
+                                + plan.oracle_weight * station_truth @ station_truth.T
+                            )
+                            / (1 + plan.oracle_weight),
+                            None,
+                        ),
+                        targets,
+                        plan,
                     ),
                 ]
-                for (
-                    method,
-                    city_score,
-                    station_score,
-                    sts_score,
-                    fusion_layer,
-                ) in methods:
-                    city_countries = country_reflections(
-                        city_score,
-                        city_truth[rows],
-                        city_codes[rows],
-                        plan.minimum_cities,
-                        plan.neighbors,
+                frozen_methods: list[tuple[FixMethod, str, str]] = [
+                    ("cosine", "plain", "cosine"),
+                    ("fusion-probe", "plain", "fusion-probe"),
+                    ("instruction", "instructed", "cosine"),
+                    ("instruction-fusion-probe", "instructed", "fusion-probe"),
+                ]
+                rows_written += [
+                    fix_score(
+                        identity,
+                        method,
+                        (
+                            scored[variant]["cities"][component],
+                            scored[variant]["stations"][component],
+                            scored[variant]["sts"][component],
+                        ),
+                        targets,
+                        plan,
+                        None if component == "cosine" else fusion_layers[variant],
                     )
-                    station_countries = country_reflections(
-                        station_score,
-                        station_truth,
-                        station_codes,
-                        plan.minimum_cities,
-                        plan.neighbors,
-                    )
-                    rows_written.append(
-                        FixScore(
-                            model_id=model.model_id,
-                            mode=mode,
-                            split_kind=kind,
-                            seed=seed,
-                            method=method,
-                            fusion_layer=fusion_layer,
-                            city_knn_gain=float(
-                                np.mean([row.knn_gain for row in city_countries])
-                            ),
-                            city_rho=float(
-                                np.mean([row.rho for row in city_countries])
-                            ),
-                            city_neighbor_km=neighbor_km(
-                                city_score, city_truth[rows], plan.neighbors
-                            ),
-                            station_knn_gain=float(
-                                np.mean([row.knn_gain for row in station_countries])
-                            ),
-                            station_rho=float(
-                                np.mean([row.rho for row in station_countries])
-                            ),
-                            station_neighbor_km=neighbor_km(
-                                station_score, station_truth, plan.neighbors
-                            ),
-                            genre_agreement=genre_agreement(
-                                station_score, genres, plan.neighbors
-                            ),
-                            sts_spearman=(
-                                None
-                                if sts_score is None
-                                else sts_spearman(sts_score, sts)
-                            ),
-                            city_countries=city_countries,
-                        )
-                    )
+                    for method, variant, component in frozen_methods
+                ]
                 print(f"Scored {model.model_id} {kind} {seed}", flush=True)
     output.mkdir(parents=True, exist_ok=True)
     write_atomic(

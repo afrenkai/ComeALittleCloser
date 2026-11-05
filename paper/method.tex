@@ -1,0 +1,137 @@
+% Method. Sources: experiments/LAYERS_RUNS.md, REFLECTED_RUNS.md, FIX_RUNS.md (runs, sizes,
+% seeds, models); docs/FREEZE.md, REFLECTED_FREEZE.md, FIX_FREEZE.md (claims); plans
+% experiments/layers-v7.json, reflected-v1.json, fix-v1.json, fix-baselines-v1-dev.json;
+% code src/come_a_little_bit_closer/evaluation/{layer_run,probes,splits,layer_reflected,
+% geo_fix,instructed_extract,fix_baselines}.py and models/{layer_catalog,hidden_states}.py.
+\section{Method}
+\label{sec:method}
+
+\subsection{Data}
+\label{sec:method-data}
+
+\paragraph{Cities.}
+We use the GeoNames \texttt{cities15000} extract \citep{geonames}: 34,196 places with a population of at least 15,000, each with coordinates, a country code and a population. A city is given to a model as text in two forms: \texttt{name} (``Lyon'') and \texttt{name-country} (``Lyon, France''). Unless stated otherwise, results use \texttt{name-country}, so the country is always in the text and the question is whether the model knows more than the country.
+
+\paragraph{Radio stations.}
+We use 11,833 geolocated stations from a Radio Browser snapshot of 2 November 2026 \citep{radiobrowser}. Each station is a short document with its coordinates removed: \texttt{Station: <name>}, \texttt{Country code: <code>} and \texttt{Genres: <tags>}, one per line. Stations serve as a transfer set for components fit on cities and to measure semantic cost through genre tags; 9,371 stations carry at least one tag. They are never used to fit anything, but they were used while selecting the remedy's settings, so we treat them as a development set.
+
+\paragraph{STS-Benchmark.}
+To measure the cost of the remedy for general semantic similarity, we use STS-Benchmark \citep{cer2017semeval}: the validation split (1,500 sentence pairs) during development and the test split (1,379 pairs) once, in the frozen run. The score is the Spearman correlation between a method's similarity and the human similarity rating.
+
+\subsection{Models and features}
+\label{sec:method-models}
+
+Table~\ref{tab:models} lists the 19 checkpoints. Each family pairs a base model with a retrieval model whose model card names that base, so that we can compare the same network before and after retrieval training. The decoder pairs are Qwen3 at 0.6B, 4B and 8B \citep{qwen3technicalreport,zhang2025qwen}, Mistral-7B with e5-mistral \citep{jiang2023mistral,wang2024improving}, and Gemma-2-9B with bge-multilingual-gemma2 \citep{gemmateam2024gemma2,xiao2023cpack}. The encoder families are XLM-R base with multilingual-e5-base \citep{conneau2019xlmr,wang2024e5}, and XLM-R large with three training stages of BGE-M3 \citep{chen2024m3}. Two randomly initialised networks (Qwen3-0.6B and XLM-R base) show what a probe can extract from tokenisation alone. XLM-R XL \citep{goyal2021xlmrxl}, a 3.5B encoder without a retrieval model, is a size control. All checkpoints are pinned to fixed revisions.
+
+\begin{table}[t]
+\centering
+\footnotesize
+\caption{Checkpoints. Each row is a family; the retrieval model was trained from the base. ``Random'' is a randomly initialised copy of the base architecture.}
+\label{tab:models}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Family & Base & Retrieval-tuned & Controls \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Decoders}} \\
+Qwen3 0.6B & Qwen3-0.6B-Base & Qwen3-Embedding-0.6B & random \\
+Qwen3 4B & Qwen3-4B-Base & Qwen3-Embedding-4B & \\
+Qwen3 8B & Qwen3-8B-Base & Qwen3-Embedding-8B & \\
+Mistral 7B & Mistral-7B-v0.1 & e5-mistral-7b-instruct & \\
+Gemma-2 9B & gemma-2-9b & bge-multilingual-gemma2 & \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Encoders}} \\
+XLM-R base & xlm-roberta-base & multilingual-e5-base & random \\
+XLM-R large & xlm-roberta-large & BGE-M3 (RetroMAE, unsupervised, final) & \\
+XLM-R XL & xlm-roberta-xl (3.5B) & --- & size control \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For every layer $\ell$ (including the embedding layer) we pool the hidden states of each text in two ways. \emph{Mean pooling} averages over the text's own tokens and excludes special tokens. \emph{Last-token pooling}, for decoders only, takes the state of an end-of-sequence token appended to the text. Last-token pooling is how the decoder retrieval models produce their search vectors. Mistral and Gemma receive their start token, which is excluded from pooling, and Gemma-2 runs with eager attention so that its attention soft-capping is applied. Inputs are truncated at 256 tokens. Texts are encoded without task instructions, except in the remedy (Section~\ref{sec:method-fix}). Features are stored per layer in half precision.
+
+\subsection{Splits}
+\label{sec:method-splits}
+
+Cities are split 60/20/20 into training, validation and test sets in two ways. \emph{Random-item} assigns cities at random. \emph{Spatial-block} assigns whole $10^\circ\times10^\circ$ latitude--longitude blocks, so validation and test cities lie in regions with no training city. Each split is drawn with three seeds (1729, 2718, 3141). Training cities are used for fitting, validation cities for every choice of layer, penalty or setting, and test cities only in the three frozen runs (Section~\ref{sec:method-prereg}). We call results on validation cities \emph{validation} or exploratory, and results on test cities \emph{test}.
+
+\subsection{Probes and controls}
+\label{sec:method-probes}
+
+Let $u(p)\in\mathbb{R}^3$ be the unit vector of a location $p$ on the sphere, and let $h_i^{(\ell)}$ be the pooled state of place $i$ at layer $\ell$. For each layer, pooling and split we fit a ridge regression from $h_i^{(\ell)}$ to one of three targets:
+\begin{itemize}
+\item \texttt{sphere}: the unit vector $u(p_i)$;
+\item \texttt{latlon}: latitude and longitude in degrees, to compare with \citet{gurnee2024space};
+\item \texttt{country-residual}: the offset $u(p_i)-\bar u_{c(i)}$ from the country centroid.
+\end{itemize}
+Here $\bar u_c$ is the normalised mean of $u(p)$ over the \emph{training} places of country $c$ (the global training mean if $c$ has none). The country-residual probe has no intercept, and its prediction is $\bar u_{c(i)}+\hat r_i$, normalised. It is told the true country and must say where in the country the place lies; under strong regularisation it falls back to the centroid. The penalty is chosen from $\{10^{-2},10^{-1},\dots,10^{6}\}$ by validation error. Predictions are normalised to the sphere; for \texttt{latlon}, latitude is clipped to $\pm90^\circ$ and longitude wrapped before computing distances.
+
+The error of a prediction is the great-circle distance to the true location ($R=6371.0088$~km). Errors are averaged within each occupied $10^\circ$ block and then over blocks, so dense regions do not dominate. The \emph{country centroid} control predicts $\bar u_{c(i)}$. Our main probe measure is the \emph{gain} over this control: the block mean of (centroid error $-$ probe error), in km. Positive gain means the probe knows more than the country. For each run (one model, split and seed) we report a 95\% interval from 1,000 bootstrap resamples of blocks. Random-initialisation models and probes fit on permuted training labels are further controls. For \texttt{latlon} we also report $R^2$, on predictions clipped to valid coordinates (primary) and on raw outputs.
+
+\subsection{Reflected geography}
+\label{sec:method-reflected}
+
+Probes ask whether position is decodable. Search uses similarity, so we also ask whether a place's most similar places are close to it. Consider the evaluated cities of one country $c$, with $n_c$ cities, a similarity $s(i,j)$, and great-circle distance $d(i,j)$. Let $N_k(i)$ be the $k=10$ cities of $c$ most similar to $i$, excluding $i$. The \emph{within-country kNN gain} is
+\begin{equation}
+G_c \;=\; 1-\frac{\frac{1}{n_c k}\sum_{i}\sum_{j\in N_k(i)} d(i,j)}{\frac{1}{n_c(n_c-1)}\sum_{i\neq j} d(i,j)}.
+\label{eq:knn-gain}
+\end{equation}
+It is 0 when the most similar cities are no closer than a random city of the same country, and it reaches its ceiling when similarity orders cities by true distance. We also compute $\rho_c$, the Spearman correlation between $s(i,j)$ and $-d(i,j)$ over all pairs in $c$. Both are averaged over countries with at least 30 evaluated cities. Because neighbours are always in the same country, neither measure can be raised by knowing the country.
+
+We compute both on the test cities of the random-item split, using last-layer vectors of \texttt{name-country} cities, with raw cosine and with \emph{centred} cosine (training-city mean subtracted). The \emph{ceiling} uses true closeness as the similarity: 0.746, 0.734 and 0.733 for the three seeds. Differences between a retrieval model and its base are paired by country, with 95\% intervals from 1,000 bootstrap resamples of countries. In the validation exploration, character $n$-gram TF-IDF similarity and a shuffled-position null served as reference points.
+
+\paragraph{Nearest-neighbour geolocation.}
+To compare probes and similarity on the same footing, we also predict a test city's position as the normalised mean position of its 10 most cosine-similar \emph{training} cities in the same country, and score it with the probe's block-mean gain over the country centroid. The \emph{crossover interaction} is the retrieval-minus-base difference of (probe error $-$ neighbour error), paired by place; a positive value means retrieval training shifts within-country geography from the linear probe towards the nearest neighbours.
+
+\subsection{A coordinate-free remedy}
+\label{sec:method-fix}
+
+The remedy changes how a frozen retrieval model's vectors are scored. It must not use coordinates at query or index time, and every fitted part sees only training cities. Let $x_i$ be the unit-normalised output vector (last layer, last token) of text $i$ and $m_i$ that of an intermediate layer $\ell^\ast$. It has three components.
+
+\paragraph{Task instruction.}
+Every text, on both the query and the document side, is encoded with the model's native instruction format and the instruction ``Given the name of a place, retrieve places that are geographically closest to it''. For e5-mistral the input is \texttt{Instruct: \{task\}\textbackslash nQuery: \{text\}}; Qwen3-Embedding uses the same format without the space after \texttt{Query:}, and bge-multilingual-gemma2 uses \texttt{<instruct>\{task\}\textbackslash n<query>\{text\}}. This was the first wording we tried; two other geographic wordings were explored on validation and not adopted.
+
+\paragraph{Layer fusion.}
+We add the centred cosine of the intermediate layer $\ell^\ast$. The layer is chosen, per model, split and seed, as the one whose centred cosine has the highest within-country kNN gain on a sample of 8,000 training cities. The candidates are every second layer of the upper half of the network plus the output layer. The centre $\mu_m$ is the mean over training cities. In the test run this chose layers 26--28 for e5-mistral, 31--33 for bge-multilingual-gemma2 and 32--34 for Qwen3-Embedding-8B.
+
+\paragraph{Distance probe.}
+A rank-32 linear map $B\in\mathbb{R}^{d\times 32}$ acts on the output vector centred on the training-city mean $\mu_x$. It is trained on training cities with a triplet hinge loss (margin 1). Each triplet holds an anchor, one of its 10 geographically nearest training cities in the same country, and a random training city of the same country; the loss asks that the anchor's squared distance in $B$-space to the near city be smaller than to the random one. We train with Adam (learning rate $10^{-3}$, batch 2,048, 3,000 steps). Like a structural probe \citep{hewitt2019structural}, $B$ defines a distance; unlike the 3-D position probe, it is trained to rank neighbours within countries.
+
+\paragraph{Score.}
+The remedy scores a pair of texts as
+\begin{equation}
+s(i,j) \;=\; \frac{\cos(x_i,x_j)+w\cos(m_i-\mu_m,\,m_j-\mu_m)}{1+w}\;-\;\lambda\,\frac{\lVert B^{\top}(x_i-x_j)\rVert_2^2}{D},
+\label{eq:fix-score}
+\end{equation}
+with $w=1$ and $\lambda=0.1$, where $D$ is the mean squared $B$-distance over the set of texts being scored. With the instruction, $x$ and $m$ come from instructed inputs. The fitted layer, centres and $B$ are applied unchanged to stations and to STS-Benchmark sentences. Equation~\ref{eq:fix-score} is a fused similarity for exhaustive search; it needs no coordinates, and the country enters only through the text.
+
+\paragraph{Baselines.}
+\emph{Cosine} is the uninstructed output vector. \emph{Country-code append} adds the training country centroid, looked up from the country code, to the vector with weight $w=0.1$ (in score form, $(\cos+w\langle\bar u_{c(i)},\bar u_{c(j)}\rangle)/(1+w)$); by construction it cannot change rankings within a country. The \emph{geocoder oracle} adds the true positions in the same way with $w=0.2$. We also report the instruction alone and fusion plus probe without the instruction. Semantic cost is measured by STS-Benchmark Spearman correlation and by station \emph{genre agreement}, the share of a tagged station's 10 most similar stations that share at least one genre tag.
+
+\paragraph{How the settings were chosen.}
+The components, $w$, $\lambda$, the rank and the instruction were chosen in an exploration on validation cities and stations, recorded in a run log. The exploration also tried pseudo-positions from neighbouring training cities and per-country centring; neither was adopted. A probe-based fix tried earlier, which amplifies the subspace of a 3-D position probe, is reported as a negative result in Section~\ref{sec:res-fix}.
+
+\subsection{Pre-registration protocol}
+\label{sec:method-prereg}
+
+Validation numbers are optimistic when layers and penalties are chosen on the same cities. We therefore scored the test cities only in runs fixed in advance, and we wrote the claims down first. The procedure had three stages, all on 4 November 2026.
+
+\begin{enumerate}
+\item \textbf{Probe claims (H1--H6).} We froze 169 cells: for every model, dataset and pooling, the best validation layer of the \texttt{country-residual} probe on random-item, and the last layer. We froze six claims with pass criteria (Table~\ref{tab:h-claims}). The test split was then scored once, for all 19 models under one plan.
+\item \textbf{Reflected-geography claims (R1--R4).} After the probe test, we explored cosine similarity on validation cities only. We then froze one pass/fail claim (R1) and three descriptive ones and ran the analysis once on the test cities.
+\item \textbf{Remedy claims (F1--F3).} After a separate exploration on validation cities, we froze two pass/fail claims (F1: the full remedy raises city within-country kNN gain over cosine, paired by country, with the interval above 0; F2: STS-Benchmark test Spearman drops by at most 0.03) and one descriptive claim, and ran the remedy once on the test cities.
+\end{enumerate}
+
+Each claim names its cells, metric and threshold. A claim that requires an interval above 0 must hold for \emph{all three seeds}, and on both splits where stated; seed means are reported but do not decide. Each frozen plan is stored with its SHA-256 hash, and the code refuses a second final run or a changed split. Every job, including failures and cancellations, is recorded in run logs. Results outside a frozen claim are secondary and labelled as such.
+
+The three claim sets use the same test cities. The later sets are different claims, fixed before their analysis read the test cities, but they were designed after the earlier test results were known. The test cities are therefore no longer fresh, and new claims need new held-out places.
+
+\subsection{Exploratory baselines (validation only)}
+\label{sec:method-baselines}
+
+Three comparisons address open questions about the remedy. They run on validation cities and STS-Benchmark validation only, they are not frozen claims, and they do not read the test cities.
+\begin{itemize}
+\item \textbf{Similarity instruction.} Each model's standard instruction for semantic similarity, ``Retrieve semantically similar text.'', on both sides. Because our cosine baseline is uninstructed, this separates an effect of using any instruction from the effect of the geographic wording.
+\item \textbf{Factorial ablation.} Instruction $\times$ layer fusion $\times$ distance probe, all eight combinations. ``Probe'' alone applies the distance probe to the final layer without fusion.
+\item \textbf{Seed-pair axes} \citep{feuerstein2026recovering}. Their axis $d=\sum(p_1-p_2)$ over seed pairs, computed on plain unit-norm output vectors without centring, one axis for latitude and one for longitude. Instead of two seed pairs we pair every training city (upper half against lower half by coordinate), in a global variant and a within-country variant. Axis scores are mapped by min--max scaling to the training coordinate range, turned into positions, and used alone or blended with cosine at $w=0.2$ and $w=1.0$, in the same form as the oracle.
+\end{itemize}
+Results are reported, labelled as validation, in Section~\ref{sec:res-closing}.

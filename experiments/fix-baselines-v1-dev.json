@@ -1,0 +1,7 @@
+{
+  "experiment_id": "fix-baselines-v1-dev",
+  "fix_plan": "experiments/fix-v1-dev.json",
+  "generic_plan": "experiments/fix-generic-v1-dev.json",
+  "output_directory": "outputs/fix-baselines-v1-dev",
+  "feuerstein_weights": [0.2, 1.0]
+}

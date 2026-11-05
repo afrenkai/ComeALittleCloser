@@ -13,10 +13,10 @@ The same day, two further analyses were frozen and tested once each:
 
 | Branch | What it holds | Status |
 |---|---|---|
-| `master` | Everything through the layer-probe test: explorer, location experiments, layer probes (PR #4) | default branch |
-| `research/fixes-and-results` | **Latest.** Reflected geography (frozen and tested), the coordinate-free fix (frozen and tested), the paper results section | pushed, to be merged into `master` |
+| `master` | Everything tested so far: explorer, location experiments, layer probes, reflected geography, the coordinate-free fix, the paper results section (PRs #4 and #5) | default branch |
+| `research/fix-baselines` | Validation-only baselines and ablations for the fix (similarity instruction, factorial ablation, Feuerstein et al. axes) and the full paper draft | done; ready for PR |
 
-Older branches (`research/layer-probes`, `research/probe-credibility`, `research/per-place-predictions`, `research/reflected-geography`, `ops/bc-cluster`) are fully contained in these two.
+All older research branches were merged and deleted on 2026-11-04.
 
 ## The question
 
@@ -44,7 +44,7 @@ The proposal asked whether text embeddings encode geography, and whether retriev
   - `country-residual`: the offset from the country's centre. This asks "does the model know *where inside the country* this place is?" and is the most informative probe.
 - **Controls.** The baseline everywhere is the *country centroid*: predict the average location of training places from the same country. Gains are reported in km over that baseline (positive = better than knowing the country). Random-init models show what a probe can extract from tokenization alone; shuffled-label probes show chance level.
 - **Splits.** `random-item` holds out random places; `spatial-block` holds out whole 10° × 10° regions (harder: the probe must generalize to unseen parts of the map). Three seeds; 95% confidence intervals from a block bootstrap.
-- **Validation vs. test.** Places are split 60/20/20 into train/validation/test. Every number below is validation. The test split will be run exactly once, after we decide which results the paper claims (see below).
+- **Validation vs. test.** Places are split 60/20/20 into train/validation/test. Numbers in "Results so far" are validation; the test split was then run once, on frozen claims (see "Test results" below).
 
 ## Results so far (validation only)
 
@@ -139,7 +139,7 @@ This changes the paper's angle. The earlier hypothesis was "geography is encoded
 
 ## A coordinate-free fix, tested (2026-11-04)
 
-Branch `research/fixes-and-results`; log in [`experiments/FIX_RUNS.md`](../experiments/FIX_RUNS.md). If retrieval models surface only part of the geography they hold, can cosine-style search be made to use more of it without giving the model coordinates? Exploration on validation found three cheap components that add up:
+Merged to `master` (PR #5); log in [`experiments/FIX_RUNS.md`](../experiments/FIX_RUNS.md). If retrieval models surface only part of the geography they hold, can cosine-style search be made to use more of it without giving the model coordinates? Exploration on validation found three cheap components that add up:
 
 1. a geography task instruction ("Given the name of a place, retrieve places that are geographically closest to it");
 2. adding the cosine of an intermediate layer;
@@ -165,7 +165,7 @@ Decisions made along the way:
 - **EmbeddingGemma is not in the probe study**: Google has not released the base it was trained from, so there is no before/after pair. It stays in the retrieval experiments.
 - **multilingual-e5-large was considered and dropped**: it would be a second retrieval model on the XLM-R-large base next to BGE-M3, and the report compares one retrieval model per family.
 - **Two extraction fixes for the new decoders** (commit `0c87d8b`): Mistral and Gemma need their start-of-text token (`<s>`, `<bos>`), which is prepended and excluded from pooling; Gemma-2 must use eager attention, because the default fast path skips its attention soft-capping. Qwen outputs are unchanged by both.
-- **The test split has not been touched.** Every number is validation.
+- **At that point the test split had not been touched**; every number was validation.
 
 ## The project update and its feedback
 
@@ -204,13 +204,13 @@ Honest assessment as of 2026-11-04: a solid workshop paper (e.g. BlackboxNLP) no
 - **Still open:**
   - Encoders are not exactly zero on spatial-block, so the claim is a gap in size, not "none".
   - Encoders and decoders also differ in training objective and data, not just architecture.
-  - The fix lacks three baselines: a plain similarity instruction, the distance map on the final layer only, and Feuerstein et al.'s projection.
+  - Against each model's standard similarity instruction, the fix costs Qwen3-8B 0.043 STS (validation); the no-STS-cost claim holds for e5-mistral and bge-gemma2 only.
   - The held-out test cities have now backed three frozen claim sets (layers-v7, reflected-v1, fix-v1). New claims should be tested on fresh places.
 - **Related work to position against** (found 2026-11-04): Feuerstein et al. 2026 (arXiv 2609.05721) recover geography from output embeddings with a few-seed projection and suggest geographic ranking. Their method is the natural baseline for our fix, and our country control is the main difference. Srinivasagan & Georges 2026 (arXiv 2609.00454) add coordinates through training, a contrast. Jiang et al. 2026 (arXiv 2605.12714) compare embedders and base LLMs layer by layer, without geography.
 - **Next for the paper:**
-  1. Run the three missing fix baselines on validation.
+  1. Done (validation, fix-baselines-v1): the geographic wording, not instruction use, drives the gain; every component helps; Feuerstein et al.'s axes do not improve within-country neighbours. See `experiments/FIX_RUNS.md`.
   2. Get fresh held-out places (for example, GeoNames cities under 15,000 people) for any new claims.
-  3. Draft the introduction, method and related work around the results in `paper/results.tex`.
+  3. Done: full draft in `paper/` (two team TODOs left).
 
 ## Reproducing
 

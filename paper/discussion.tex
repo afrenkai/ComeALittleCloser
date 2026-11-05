@@ -1,0 +1,45 @@
+% Discussion, limitations, conclusion. Numbers copied from results.tex and its sources.
+\section{Discussion}
+\label{sec:discussion}
+
+\paragraph{Decodable is not the same as reflected.}
+Base decoders from 4B up hold within-country geography that a linear probe can read, yet the cosine neighbours of their output vectors are often barely closer than random cities of the same country. With last-token pooling, kNN gain is 0.018--0.051 for the Qwen3-4B, Qwen3-8B and Mistral-7B bases (Table~\ref{tab:r1}). Gemma-2-9B is an exception, at 0.17--0.18 with both poolings. A probe result alone therefore says little about search. The reverse also holds: for retrieval models, nearest neighbours locate cities within known regions better than the probe does (R3), so probe gains understate what these models hold.
+
+\paragraph{What retrieval training changes.}
+Retrieval training does not add decodable geography. No pair shows a reliable change in probe gain (H2). It changes how much of that geography the output vector shows to cosine similarity. The validation depth profile suggests two mechanisms. With mean pooling, the base models' intermediate layers already reflect geography about as well as the retrieval models, and their last layers discard part of it; retrieval training mostly keeps it. With last-token pooling, the base model's last token reflects little at any depth, and retrieval training creates the signal. These mechanisms are validation-only and descriptive; the frozen claim is about output vectors.
+
+\paragraph{Why the remedy works.}
+Each component uses a different part of what the model already holds. The layer fusion borrows an intermediate layer that reflects more geography than the output, as the depth profile shows. The distance probe learns which directions separate near from far cities within a country. It still helps when whole regions are held out, so it does not simply memorise regions. The instruction is the most surprising component. The same frozen model, given a geographic instruction, reflects more within-country geography. Given a generic similarity instruction, it reflects less than without any instruction, and station genre agreement rises (validation). The instruction thus steers which facet of a place name cosine similarity tracks. The similarity-instruction baseline confirms that the wording matters: with fusion and probe on both, the geographic instruction beats it on cities in every validation run. It also shows that the STS gain on test comes from using any instruction. Against each model's own similarity instruction, the fix costs at most 0.008 STS for the two frozen models but 0.043 for Qwen3-Embedding-8B (validation).
+
+\paragraph{When to use it.}
+The remedy suits a search system that cannot geocode its documents but can re-encode them. On cities it beats a blend with true coordinates at $w=0.2$; on stations the coordinate blend remains ahead (Table~\ref{tab:fixes} and Section~\ref{sec:res-closing}). If coordinates are available, using them is still better. The remedy is also not free for every model. For Qwen3-Embedding-8B it raises city neighbour quality but lowers station genre agreement by about 0.10, so the semantic cost must be checked per model.
+
+\paragraph{What pre-registration bought.}
+Freezing the claims made three failures visible. H3 (``encoders show none'') failed on two of 42 runs, where weak probes beat a biased centroid in held-out regions. The data support a gap in magnitude: no encoder run above 50~km, no 4B+ decoder run below 116~km. H4 failed because one retrieval model passed on two seeds out of three. R1 failed its all-48 rule on two mean-pooled comparisons with positive point estimates; the supported statement is restricted to last-token pooling. Each failure narrowed a claim we would otherwise have stated too broadly. Freezing also had a cost. The thresholds were strict, and a rule such as ``all three seeds'' can fail on one noisy interval. We kept the failures and stated what the data do support, rather than revising criteria after the fact.
+
+\section{Limitations}
+\label{sec:limitations}
+
+\paragraph{Reuse of the test cities.}
+The same test cities support three claim sets. Each set was fixed before its analysis read them, but the later sets were designed after the earlier results were known, so the test is no longer fresh. New claims, including any about the baselines, need new held-out places, such as GeoNames cities below 15,000 inhabitants.
+
+\paragraph{Selection on validation and stations.}
+The remedy's weights, rank, layer candidates and instruction were chosen while looking at validation cities and at stations. Station results are therefore not held out. The test cities and STS-Benchmark test were not used for any choice, so F1 and F2 are not affected by this selection, but the station results are. The three geographic wordings we tried differ in effect size, and we froze the first, pre-chosen wording.
+
+\paragraph{Narrow inputs and metric.}
+Cities are short strings that name the country, and only places with at least 15,000 inhabitants are included. The kNN gain is computed among held-out cities of one country and ignores neighbours across borders. It does not measure retrieval quality for mixed queries, and we have not checked whether instructed documents hurt queries that are not about places. STS-Benchmark and genre agreement are coarse proxies for semantic cost.
+
+\paragraph{Statistics.}
+We use three seeds and per-run bootstrap intervals, without correction for the many comparisons outside the frozen claims. The spatial-block country centroid can be biased when a country's main region is held out, which inflates gains on that split.
+
+\paragraph{Confounds and coverage.}
+Encoders and decoders differ in pretraining objective and data as well as architecture; XLM-R XL rules out size alone but does not isolate architecture. Some retrieval models were not run in their native configuration: multilingual-e5-base without its \texttt{passage:} prefix, and BGE-M3 with mean pooling rather than its CLS vector. Held-out places may appear in pretraining data. Probes show that information is decodable, not that a model uses it.
+
+\paragraph{Scope relative to the proposal.}
+The proposal also planned an audio pilot, human annotation of station metadata, and a held-out audio--image dataset. None of these were carried out, and this paper makes no claim about them.
+\todo{confirm with the team which proposal items (interface views, audio, annotation) to mention here.}
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+Large decoder language models know where places lie within their countries, and retrieval training keeps that knowledge decodable. The cosine similarity used for search reflects only part of it: little in most base models' output vectors and about a third of the ceiling in the best retrieval model. A coordinate-free remedy fit on training cities, with a geography instruction, intermediate-layer fusion and a rank-32 distance probe, raises within-country neighbour quality on held-out cities to about half the ceiling without lowering STS-Benchmark correlation. Every claim was fixed before the single test run, and we report those that failed. On validation, the gain depends on the geographic wording rather than on using an instruction, and seed-pair coordinate axes do not reproduce it; a test on fresh places is needed to confirm both.

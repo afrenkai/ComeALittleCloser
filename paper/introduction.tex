@@ -1,0 +1,22 @@
+% Introduction. Motivation from paper/proposal_extended.tex; numbers from the frozen
+% test results (LAYERS_V7_CLAIMS.md, REFLECTED_V1_RESULTS.md, FIX_V1_RESULTS.md).
+\section{Introduction}
+\label{sec:intro}
+
+A listener who types ``nearest rock station'' into a radio directory asks for two things: a genre and a place. An embedding search system serves both requests with one number, the cosine similarity between the query vector and each document vector. Shared genre, language or branding can make two stations similar even when they are far apart. For a query that asks for physical proximity, the similarity must also track distance.
+
+Distance between countries is the easy part. Most station and place descriptions name their country, and a model that only recognises the country can already rule out most of the world. The hard part is distance \emph{within} a country: whether Lyon is closer to Grenoble or to Lille. This paper studies that within-country geography in text embeddings.
+
+Two separate questions are often merged. The first is whether the information is \emph{decodable}: can a trained probe read a place's position from the model's hidden states? \citet{gurnee2024space} show that linear probes recover latitude and longitude from large language models. The second is whether the information is \emph{reflected} in the similarity that search uses: are a place's cosine nearest neighbours close to it on the map? A model can hold information that its output geometry does not express. Retrieval training, which turns a base language model into an embedding model, could also remove information or bring it to the surface.
+
+We separate these questions with a controlled design. Four base decoders (Qwen3-4B, Qwen3-8B, Mistral-7B and Gemma-2-9B) are paired with retrieval models trained from them, and encoder families provide a contrast. We probe every layer of 19 checkpoints on 34,196 GeoNames cities. Every probe is compared with a training-only country centroid, and our headline probe predicts only the offset from that centroid. For reflected geography we use a within-country nearest-neighbour score whose ceiling comes from true distances. Places are split into training, validation and test cities, and layers, penalties and fix settings are chosen on validation only.
+
+Our findings form a diagnosis and a remedy.
+\begin{enumerate}
+\item \textbf{Decodable.} Every decoder from 4B parameters up, base and retrieval-tuned, holds within-country geography that a linear probe can decode. On test cities it beats the country centroid by 116--375~km on all 48 runs, and the gain holds for the smallest fifth of cities by population. Retrieval training keeps the signal decodable in all four pairs. A country-centroid control also shows that high latitude/longitude $R^2$, the measure of \citet{gurnee2024space}, mostly reflects knowing the country.
+\item \textbf{Partly reflected.} The output vectors of most base models reflect little of this geography in cosine similarity. Retrieval models' output vectors reflect more, at the last-token pooling they use for search, in all four pairs. Even the best one, e5-mistral, reaches only about a third of the true-distance ceiling.
+\item \textbf{A cheap remedy.} Three components need no coordinates at query or index time and are fit on training cities only: a geography task instruction, fusion with an intermediate layer, and a rank-32 distance probe. For e5-mistral and bge-multilingual-gemma2 they raise within-country neighbour quality on test cities from about a third to about half of the ceiling. STS-Benchmark correlation does not drop relative to the uninstructed model. Validation ablations show that the geographic wording, not the use of an instruction, drives the gain, and that seed-pair coordinate axes \citep{feuerstein2026recovering} do not improve within-country neighbours.
+\item \textbf{A pre-registered protocol.} We wrote down every claim and pass criterion before the test split was scored, in three sets (H1--H6, R1--R4, F1--F3). Each set was run once. Three claims failed under their own rules, and we report them with the narrower statements the data support.
+\end{enumerate}
+
+Section~\ref{sec:related} places this work among probing, geographic language modelling and embedding research. Section~\ref{sec:method} describes data, models, probes, metrics, the remedy and the protocol. Section~\ref{sec:results} reports results, and Section~\ref{sec:discussion} discusses limitations.

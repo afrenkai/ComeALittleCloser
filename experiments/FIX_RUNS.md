@@ -156,3 +156,40 @@ The fix is now `evaluation/geo_fix.py`, with instruction-conditioned extraction 
 | 3322692 | Module dev run, resubmitted on `gtml` (L40S requested; CPU work) | Completed. Reproduces the exploration: e5-mistral full fix 0.360 / 0.357 city kNN (random-item / spatial-block) vs cosine 0.252 / 0.237; bge-gemma2 0.344 / 0.341 vs 0.204 / 0.213; qwen3-8b 0.246 / 0.216 vs 0.133 / 0.123. The paired CI is above 0 in all 18 runs. STS-B dev Spearman change of the full fix vs cosine: e5 +0.020 to +0.022, gemma +0.030 to +0.031, qwen -0.009 to -0.012. Genre change: e5 -0.005 to -0.001, gemma +0.010 to +0.016, qwen about -0.10. The plain cosine baseline is uninstructed, while e5 and bge are usually run with a task instruction, so part of the STS gain is likely any-instruction rather than geography. Report: `outputs/fix-v1-dev/dev/report.md` | 16:52-17:28 |
 | 3325419 | Check suite (ruff, black, pytest) at `69de7bd` | Completed, 74 passed | 0:28 |
 | 3325420 | **Final (test), run once**: `fix-v1.json` (SHA-256 verified `0e8267f5…cdd6ff2`), on `gtml`, `afterok:3325419`. `outputs/fix-v1` did not exist before submission | Completed. F1 supported (12/12, lowest CI bound +0.084); F2 supported (12/12, STS +0.013 to +0.028). Results: `experiments/FIX_V1_RESULTS.md` | 35:20 |
+
+Two details of fix-v1 that `docs/FIX_FREEZE.md` does not spell out:
+- **Fusion candidates.** These are the kept layers (every second layer of the upper half, plus the output), not every layer.
+- **Distance normalisation.** The distance probe's squared distances are divided by their mean over the set being scored (the evaluated cities, all stations, or the STS sentences). That uses no labels, but it is computed on the scored set, not on training cities. Both behaviours were fixed before the test run, and the code at the frozen commit is the reference. The paper's method section describes both.
+
+## fix-baselines-v1: validation-only baselines and ablations (2026-11-04)
+
+These answer reviewer questions about fix-v1. Everything here is validation only: test cities and STS-B test are not read. `experiments/fix-generic-v1-dev.json` lists only the STS dev split, and extraction now encodes only the STS splits a plan lists. These are not frozen claims; the fix-v1 test is already used, so any new claim needs fresh held-out places.
+
+- **Similarity-instruction baseline.** Each model's standard STS instruction, "Retrieve semantically similar text.", on both sides (`experiments/fix-generic-v1-dev.json`, features in `data/processed/instructed-generic-v1`). This separates an any-instruction effect from the geographic wording. The exploration used a different control wording ("Given a text, retrieve semantically similar text").
+- **Factorial ablation.** Instruction × layer fusion × distance probe. "Probe" alone is the distance map on the final layer with no fusion.
+- **Feuerstein et al. (2026) axes.** Their Eq. 2, d = Σ(p₁ − p₂), on plain unit-norm output vectors (no centring, as in the paper). Latitude and longitude axes come from training cities. The paper uses K = 2 unspecified seed pairs, so we use every training city in a pair (upper half against lower half), which is at least as stable. There are two variants: global pairs, and pairs within each country. Scores are min-max mapped to the training coordinate range (their mapping) and turned into positions. They are used alone, and blended with cosine at w = 0.2 and 1.0 in the oracle's form.
+
+| Job | Role | Outcome | Elapsed |
+| --- | --- | --- | --- |
+| 3331578 (array 0-2) | Similarity-instruction extraction (cities, stations, STS dev plain and instructed) for e5-mistral, bge-gemma2, qwen3-8b-embedding; gtml L40S | Completed | 18:54-19:14 |
+| 3331775 | `fix_baselines --config experiments/fix-baselines-v1-dev.json`, on `gtml`, `afterok:3331578` | Failed after the first model's first split. Feuerstein positions for items beyond the training extremes had longitudes outside ±180°, which the coordinate check rejects; latitude was already clamped. Fixed by clamping longitude too (min-max mapping, no wrap-around). No results were written | 3:39 |
+| 3333493 | Baselines, resubmitted with the clamp | Completed. Report: `outputs/fix-baselines-v1-dev/dev/report.md` | 59:11 |
+
+Check: the 72 rows shared with fix-v1-dev (cosine, fusion-probe, instruction, instruction-fusion-probe; 3 models x 2 splits x 3 seeds) match `outputs/fix-v1-dev/dev/scores.jsonl` in every metric and fusion layer, so the `geo_fix` refactor changed no scores.
+
+### Findings (validation only, not frozen)
+
+City figures are within-country kNN gain; differences are paired by country with 95% block-bootstrap intervals; 18 runs = 3 models x 2 splits x 3 seeds.
+
+1. **The geographic wording drives the city gain, not the use of an instruction.** The similarity instruction alone lowers city kNN gain below the uninstructed vector in every model (RI means: e5 0.252 -> 0.182, gemma 0.204 -> 0.153, qwen 0.133 -> 0.056) and raises genre agreement and STS. With fusion and probe on both, geographic minus similarity instruction is +0.058 to +0.131, and all 18 intervals are above zero. Station kNN gain +0.04 to +0.11; genre -0.07 to -0.15.
+2. **The fix-v1 STS rise is an any-instruction effect.** The similarity instruction raises STS dev by 0.024-0.033 over the uninstructed vector. Against the similarity instruction alone (standard use), the full fix changes STS dev by -0.008 (e5), +0.006 (gemma) and -0.043 (qwen). F2 compared against the uninstructed vector; against standard use, the Qwen3-8B cost exceeds the 0.03 margin.
+3. **Every component helps, and the instruction helps most.**
+   - Instruction alone over cosine: +0.066 to +0.090 (RI means).
+   - Adding fusion to instruction + probe: +0.005 to +0.038, with 15/18 intervals above zero (the three misses are qwen); genre +0.011 to +0.030.
+   - Adding the probe to instruction + fusion: +0.002 to +0.027, with 15/18 intervals above zero (one e5 and two qwen spatial-block runs miss); station +0.004 to +0.024, genre -0.015 to -0.028.
+   - Fusion + probe without an instruction: +0.024 to +0.076 over cosine.
+4. **Feuerstein seed-pair axes do not improve within-country neighbours.**
+   - Alone, they score 0.034-0.149 city kNN, far below cosine, and genre collapses to 0.12-0.16.
+   - Blended at w=0.2: the global axes never beat cosine; the within-country axes add at most +0.019 (gemma spatial-block); w=1.0 lowers both.
+   - This matches the 3-D position probe: a linear coordinate readout is less locally accurate than cosine.
+   - We paired every training city rather than K=2 seeds, which should favour the axes.
