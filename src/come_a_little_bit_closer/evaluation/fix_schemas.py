@@ -22,6 +22,9 @@ type FixCollection = Literal[
     "sts-test",
     "towns-name-country",
     "small-towns-name-country",
+    "search-documents",
+    "search-queries-check",
+    "search-queries-test",
 ]
 type FreshPart = Literal["check", "test"]
 type ScoredSet = Literal["cities", "towns", "small-towns"]
@@ -245,3 +248,57 @@ class FeuersteinMap:
     projection_high: np.ndarray
     coordinate_low: np.ndarray
     coordinate_high: np.ndarray
+
+
+class SearchSource(BaseModel):
+    """Station search: stations of a genre near a town, within the town's country."""
+
+    genre_plan: Path = Path("experiments/location-v2.json")
+    genres: int = Field(default=8, gt=0)
+    minimum_stations: int = Field(default=20, gt=10)
+    origins_per_pair: int = Field(default=10, gt=0)
+    sample_seed: int = 20261104
+    partition_seed: int = 20261104
+    check_fraction: float = Field(default=0.2, gt=0, lt=1)
+
+
+class SearchQuery(BaseModel):
+    query_id: str
+    genre: str
+    town_id: str
+    country_code: str
+    text: str
+    latitude: float
+    longitude: float
+
+
+class SearchPair(BaseModel):
+    """A geographic-instruction plan and its web-search-instruction twin."""
+
+    fix_plan: Path
+    search_plan: Path
+
+
+class SearchPlan(BaseModel):
+    experiment_id: str
+    pairs: list[SearchPair]
+    output_directory: Path
+    towns_sha256: str
+    claim_models: list[str]
+
+
+class CountrySearch(BaseModel):
+    country_code: str
+    queries: int
+    gain: float
+
+
+class SearchScore(BaseModel):
+    model_id: str
+    part: FreshPart
+    split_kind: SplitKind
+    seed: int
+    method: str
+    queries: int
+    search_gain: float
+    countries: list[CountrySearch]

@@ -1,0 +1,23 @@
+{
+  "experiment_id": "search-v1",
+  "pairs": [
+    {
+      "fix_plan": "experiments/fix-v1.json",
+      "search_plan": "experiments/search-instruction-v1.json"
+    },
+    {
+      "fix_plan": "experiments/fix-v2.json",
+      "search_plan": "experiments/search-instruction-v1.json"
+    }
+  ],
+  "output_directory": "outputs/search-v1",
+  "towns_sha256": "56cf653fa79d1f5682c55231a46dd43b680abeac2d8aaaae3335b6248f4d8442",
+  "claim_models": [
+    "e5-mistral",
+    "bge-multilingual-gemma2",
+    "qwen3-4b-embedding",
+    "harrier-0.6b",
+    "harrier-27b",
+    "octen-8b"
+  ]
+}

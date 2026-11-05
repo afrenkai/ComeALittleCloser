@@ -48,7 +48,11 @@ from come_a_little_bit_closer.evaluation.location_schemas import (
     SplitManifest,
 )
 from come_a_little_bit_closer.evaluation.probes import bootstrap_interval
-from come_a_little_bit_closer.evaluation.splits import spatial_block, split_indices
+from come_a_little_bit_closer.evaluation.splits import (
+    holdout_parts,
+    spatial_block,
+    split_indices,
+)
 from come_a_little_bit_closer.geometry.distances import spherical_vectors
 from come_a_little_bit_closer.geometry.schemas import Coordinates
 
@@ -56,12 +60,8 @@ from come_a_little_bit_closer.geometry.schemas import Coordinates
 def town_partition(
     count: int, plan: FreshPlan, cap: int | None = None
 ) -> dict[FreshPart, np.ndarray]:
-    """Check and test parts of a fixed permutation; a cap keeps the test part's
-    first places in permutation order."""
-    order = np.random.default_rng(plan.partition_seed).permutation(count)
-    check_count = int(round(count * plan.check_fraction))
-    test = order[check_count:] if cap is None else order[check_count:][:cap]
-    return {"check": np.sort(order[:check_count]), "test": np.sort(test)}
+    check, test = holdout_parts(count, plan.partition_seed, plan.check_fraction, cap)
+    return {"check": check, "test": test}
 
 
 def scored_town_rows(

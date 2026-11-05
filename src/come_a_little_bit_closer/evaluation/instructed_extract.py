@@ -14,6 +14,7 @@ from come_a_little_bit_closer.evaluation.fix_schemas import (
     FixPlan,
     InstructedManifest,
     InstructedModel,
+    SearchSource,
     StsPairs,
     TownExtraction,
 )
@@ -21,6 +22,12 @@ from come_a_little_bit_closer.evaluation.layer_extract import (
     atomic_write,
     dataset_items,
     town_items,
+)
+from come_a_little_bit_closer.evaluation.search_items import (
+    catalog_stations,
+    search_queries,
+    station_documents,
+    text_checksum,
 )
 from come_a_little_bit_closer.models.hidden_states import LayerExtractor
 from come_a_little_bit_closer.models.layer_catalog import find_layer_model
@@ -58,6 +65,22 @@ def collection_texts(
     if collection in ["towns-name-country", "small-towns-name-country"]:
         items = town_items(town_source(collection))
         return items.item_ids, items.texts, items.source_sha256
+    if collection == "search-documents":
+        stations = catalog_stations()
+        documents = station_documents(stations)
+        return (
+            [station.station_id for station in stations],
+            documents,
+            text_checksum(documents),
+        )
+    if collection in ["search-queries-check", "search-queries-test"]:
+        queries = search_queries(
+            catalog_stations(),
+            SearchSource(),
+            "check" if collection == "search-queries-check" else "test",
+        )
+        texts = [query.text for query in queries]
+        return [query.query_id for query in queries], texts, text_checksum(texts)
     split = "dev" if collection == "sts-dev" else "test"
     pairs = read_sts(plan.sts_files[split], plan.sts_sha256[split])
     return (
@@ -245,11 +268,24 @@ def main() -> None:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--ampere", action="store_true")
-    parser.add_argument("--towns", choices=["plain-and-instructed", "instructed"])
+    parser.add_argument(
+        "--towns",
+        "--variants",
+        dest="towns",
+        choices=["plain-and-instructed", "instructed"],
+    )
     parser.add_argument(
         "--town-collections",
+        "--collections",
+        dest="town_collections",
         nargs="+",
-        choices=["towns-name-country", "small-towns-name-country"],
+        choices=[
+            "towns-name-country",
+            "small-towns-name-country",
+            "search-documents",
+            "search-queries-check",
+            "search-queries-test",
+        ],
         default=["towns-name-country"],
     )
     arguments = parser.parse_args()

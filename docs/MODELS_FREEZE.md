@@ -62,7 +62,7 @@ A query asks for radio stations of a genre near a town. Genre is matched lexical
 
 - **Documents (11,833 catalog stations):** `Station: {name}\nLocation: {place}, {country}\nGenres: {tags}`. The place is the `cities15000` place nearest to the station's coordinates, like the city a station directory would list. Coordinates are never shown to a model.
 - **Queries:** `{genre} radio stations near {town}, {country}`.
-  - Genres are the 8 most frequent station genre tags.
+  - Genres are the 8 most frequent station genres from the frozen 45-genre list of `experiments/location-v2.json`: pop, rock, dance, pop rock, jazz, classic rock, electronic and house. Raw tags also include non-genre words such as "radio" and "estación". This was corrected on 2026-11-05, before any search code or result existed.
   - For each genre, we use countries with at least 20 stations carrying it.
   - Origins come from the fresh-v1 towns: the check part for validation runs, the test part for the test run. Spatial-block keeps only towns outside the training blocks. Up to 10 towns per genre and country are drawn with seed 20261104.
 - **Pool:** stations in the query's country carrying the query's genre.
