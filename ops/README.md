@@ -26,3 +26,5 @@ bc_sbatch_gtml ops/embed.sbatch
 ```
 
 The cu129 Torch wheels support sm_75 and newer, so `bc_sbatch_gpu` restricts GPU jobs to A100, L40S, and H200 nodes and skips the V100 nodes. When `short` is backed up, `bc_sbatch_gtml` submits to the gtml L40S node instead. The site profile sets `SBATCH_EXPORT=none`, so `bc.env` names the cache variables jobs receive; add any new variable a job needs to that list. Download pinned checkpoints on the login node with `hf download <checkpoint> --revision <revision>` before running the offline jobs.
+
+`fix-extract.sbatch` extracts instruction-conditioned features for a fix plan (one array task per model): `sbatch -A gtml --array=0-2 ops/fix-extract.sbatch <plan> <model0> <model1> <model2>`. For fresh towns only, add `--export=ALL,EXTRACT_ARGS="--towns plain-and-instructed"` (or `"--towns instructed"` for a second instruction plan).

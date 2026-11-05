@@ -2,7 +2,7 @@
 
 A radio explorer and research codebase comparing geographic and embedding neighborhoods. FastAPI and DuckDB serve a full-screen HTMX/Canvas globe and a three-dimensional PCA view. The five text baselines are Qwen3, BGE-M3, multilingual E5, EmbeddingGemma 2, and CLAP's text tower.
 
-**Team progress (2026-11-04):** see [docs/PROGRESS.md](docs/PROGRESS.md) for a plain-language summary of the layer-wise probe, reflected-geography and fix results (all tested once on held-out cities), figures, and next steps.
+**Team progress (2026-11-04):** see [docs/PROGRESS.md](docs/PROGRESS.md) for a plain-language summary of the layer-wise probe, reflected-geography and fix results (each frozen and tested once on held-out cities), the fix's baselines, the fresh-towns test (frozen and tested once on 32,148 new towns), figures, and next steps.
 
 ## Run locally
 
@@ -87,6 +87,6 @@ The repository uses `master` as its base branch. Create feature branches with `g
 
 ## Paper and formalization
 
-`paper/proposal_extended.tex` is the eight-page TMLR proposal; `paper/basic_math.tex` records the mathematical setup. Compile from `paper/` with `latexmk -pdf -outdir=build proposal_extended.tex`.
+`paper/final.tex` is the full paper draft (sections in `abstract.tex` through `discussion.tex`); `paper/proposal_extended.tex` is the eight-page TMLR proposal; `paper/basic_math.tex` records the mathematical setup. Compile from `paper/` with `pdflatex -interaction=nonstopmode -output-directory=build final.tex`, then `bibtex build/final`, then `pdflatex` twice (latexmk is not installed on BC Andromeda; locally, `latexmk -pdf -outdir=build final.tex` also works).
 
 The Lean 4.19.0 / Mathlib v4.19.0 project formalizes geometry, ranking, losses, projection, eligibility, and evaluation definitions. From `formal/`, run `lake build ComeCloser`; a fresh checkout first needs `lake update` and `lake exe cache get`. These proofs do not verify the numerical solver, learned encoders, or H3 implementation.
