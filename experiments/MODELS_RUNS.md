@@ -41,3 +41,4 @@ Small towns (1,000-4,999 people, not in `cities5000` or `cities15000`, unique te
 | 3363091 (array 0-3) | Same for qwen3-4b, harrier-0.6b, octen-8b, nemotron-8b with `fix-v2-dev.json` | Submitted | |
 | 3363092 (array 0-5) | Web-search-instruction queries (`search-instruction-v1.json`) for the six runnable instruction models | Submitted | |
 | 3363093 | harrier-27b search features on one H200 | Submitted | |
+| 3363197 | harrier-27b on 4 gtml L40S, fp32 spread over GPUs (`spread_over_gpus`): parity, then all extraction steps. Starts after the L40S arrays; whichever of this and the H200 jobs finishes first is used | Submitted | |
