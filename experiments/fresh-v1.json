@@ -1,0 +1,12 @@
+{
+  "experiment_id": "fresh-v1",
+  "fix_plan": "experiments/fix-v1.json",
+  "generic_plan": "experiments/fix-generic-v1-dev.json",
+  "output_directory": "outputs/fresh-v1",
+  "towns_sha256": "56cf653fa79d1f5682c55231a46dd43b680abeac2d8aaaae3335b6248f4d8442",
+  "check_fraction": 0.2,
+  "partition_seed": 20261104,
+  "claim_models": ["e5-mistral", "bge-multilingual-gemma2"],
+  "feuerstein_weights": [0.2, 1.0],
+  "feuerstein_claim_weight": 0.2
+}

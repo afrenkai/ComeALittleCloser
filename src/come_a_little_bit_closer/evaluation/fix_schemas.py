@@ -16,8 +16,14 @@ type UnitMatrix = Float32[np.ndarray, "items features"]
 type ScoreMatrix = Float32[np.ndarray, "items items"]
 type DistanceProbe = Float32[np.ndarray, "features rank"]
 type FixCollection = Literal[
-    "cities-name-country", "stations-metadata", "sts-dev", "sts-test"
+    "cities-name-country",
+    "stations-metadata",
+    "sts-dev",
+    "sts-test",
+    "towns-name-country",
 ]
+type FreshPart = Literal["check", "test"]
+type TownExtraction = Literal["plain-and-instructed", "instructed"]
 type FixMethod = Literal[
     "cosine",
     "country",
@@ -124,6 +130,38 @@ class BaselinePlan(BaseModel):
     generic_plan: Path
     output_directory: Path
     feuerstein_weights: list[float] = [0.2, 1.0]
+
+
+class FreshPlan(BaseModel):
+    """Fresh held-out towns, scored with components fit on the original training cities.
+
+    Towns are split once into a check part (pipeline checks) and a test part (run once).
+    """
+
+    experiment_id: str
+    fix_plan: Path
+    generic_plan: Path
+    output_directory: Path
+    towns_sha256: str
+    check_fraction: float = Field(default=0.2, gt=0, lt=1)
+    partition_seed: int
+    claim_models: list[str]
+    feuerstein_weights: list[float] = [0.2, 1.0]
+    feuerstein_claim_weight: float = 0.2
+
+
+class TownScore(BaseModel):
+    model_id: str
+    part: FreshPart
+    split_kind: SplitKind
+    seed: int
+    method: FixMethod
+    blend_weight: float | None = None
+    fusion_layer: int | None = None
+    towns: int
+    city_knn_gain: float
+    city_rho: float
+    city_countries: list[CountryReflection]
 
 
 @dataclass(frozen=True)

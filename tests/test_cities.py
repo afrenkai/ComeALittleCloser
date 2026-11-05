@@ -1,8 +1,12 @@
 import zipfile
 from pathlib import Path
 
-from come_a_little_bit_closer.data.cities import load_places, place_text
-from come_a_little_bit_closer.data.schemas import Place
+from come_a_little_bit_closer.data.cities import (
+    load_fresh_towns,
+    load_places,
+    place_text,
+)
+from come_a_little_bit_closer.data.schemas import Place, TownSource
 from come_a_little_bit_closer.geometry.schemas import Coordinates
 
 
@@ -60,3 +64,34 @@ def test_place_text_conditions() -> None:
     assert place_text(place, "name-country") == "Lyon, France"
     unnamed = place.model_copy(update={"country_name": ""})
     assert place_text(unnamed, "name-country") == "Lyon"
+
+
+def test_fresh_towns_drop_reference_places_bands_and_shared_texts(
+    tmp_path: Path,
+) -> None:
+    rows = {
+        "cities15000": [geonames_row("1", "Lyon", "45", "4", "FR", "472317")],
+        "cities5000": [
+            geonames_row("1", "Lyon", "45", "4", "FR", "472317"),
+            geonames_row("2", "Lyon", "46", "5", "FR", "9000"),
+            geonames_row("3", "Anse", "45.9", "4.7", "FR", "7000"),
+            geonames_row("4", "Bron", "45.7", "4.9", "FR", "15000"),
+            geonames_row("5", "Seat", "45.1", "4.1", "FR", "0"),
+            geonames_row("6", "Twin", "44", "3", "FR", "6000"),
+            geonames_row("7", "Twin", "43", "2", "FR", "6000"),
+            geonames_row("8", "Isle", "1", "1", "ZZ", "6000"),
+        ],
+    }
+    for stem, lines in rows.items():
+        with zipfile.ZipFile(tmp_path / f"{stem}.zip", "w") as archive:
+            archive.writestr(f"{stem}.txt", "\n".join(lines) + "\n")
+    country_info_path = tmp_path / "countryInfo.txt"
+    country_info_path.write_text("FR\tFRA\t250\tFR\tFrance\n")
+    towns = load_fresh_towns(
+        TownSource(
+            archive=tmp_path / "cities5000.zip",
+            reference_archive=tmp_path / "cities15000.zip",
+            country_info=country_info_path,
+        )
+    )
+    assert [town.place_id for town in towns] == ["3"]

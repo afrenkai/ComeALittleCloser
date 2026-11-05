@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -48,3 +49,13 @@ class Place(BaseModel):
     country_name: str
     population: int = Field(ge=0)
     coordinates: Coordinates
+
+
+class TownSource(BaseModel):
+    """GeoNames towns absent from the reference extract, within a population band."""
+
+    archive: Path = Path("data/raw/cities5000.zip")
+    reference_archive: Path = Path("data/raw/cities15000.zip")
+    country_info: Path = Path("data/raw/countryInfo.txt")
+    minimum_population: int = Field(default=5000, ge=0)
+    maximum_population: int = Field(default=15000, gt=0)

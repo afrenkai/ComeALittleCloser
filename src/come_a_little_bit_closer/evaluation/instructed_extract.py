@@ -8,16 +8,19 @@ from pathlib import Path
 import numpy as np
 import transformers
 
+from come_a_little_bit_closer.data.schemas import TownSource
 from come_a_little_bit_closer.evaluation.fix_schemas import (
     FixCollection,
     FixPlan,
     InstructedManifest,
     InstructedModel,
     StsPairs,
+    TownExtraction,
 )
 from come_a_little_bit_closer.evaluation.layer_extract import (
     atomic_write,
     dataset_items,
+    town_items,
 )
 from come_a_little_bit_closer.models.hidden_states import LayerExtractor
 from come_a_little_bit_closer.models.layer_catalog import find_layer_model
@@ -51,6 +54,9 @@ def collection_texts(
         return items.item_ids, items.texts, items.source_sha256
     if collection == "stations-metadata":
         items = dataset_items("stations", "metadata")
+        return items.item_ids, items.texts, items.source_sha256
+    if collection == "towns-name-country":
+        items = town_items(TownSource())
         return items.item_ids, items.texts, items.source_sha256
     split = "dev" if collection == "sts-dev" else "test"
     pairs = read_sts(plan.sts_files[split], plan.sts_sha256[split])
@@ -109,15 +115,9 @@ def already_extracted(
     )
 
 
-def extract_instructed(
-    plan: FixPlan, model: InstructedModel, device: str
-) -> list[Path]:
-    spec = find_layer_model(model.model_id)
-    if spec.architecture != "decoder":
-        raise ValueError("Instructed extraction uses last-token pooling (decoders).")
-    extractor = LayerExtractor(spec, device, plan.max_length)
+def standard_jobs(plan: FixPlan) -> list[tuple[FixCollection, bool]]:
     sts_collections: dict[str, FixCollection] = {"dev": "sts-dev", "test": "sts-test"}
-    jobs: list[tuple[FixCollection, bool]] = [
+    return [
         ("cities-name-country", True),
         ("stations-metadata", True),
     ] + [
@@ -125,6 +125,25 @@ def extract_instructed(
         for split in plan.sts_files
         for instructed in [False, True]
     ]
+
+
+def town_jobs(extraction: TownExtraction) -> list[tuple[FixCollection, bool]]:
+    instructed: list[tuple[FixCollection, bool]] = [("towns-name-country", True)]
+    if extraction == "instructed":
+        return instructed
+    return [("towns-name-country", False)] + instructed
+
+
+def extract_instructed(
+    plan: FixPlan,
+    model: InstructedModel,
+    device: str,
+    jobs: list[tuple[FixCollection, bool]],
+) -> list[Path]:
+    spec = find_layer_model(model.model_id)
+    if spec.architecture != "decoder":
+        raise ValueError("Instructed extraction uses last-token pooling (decoders).")
+    extractor = LayerExtractor(spec, device, plan.max_length)
     written = []
     for collection, instructed in jobs:
         item_ids, raw_texts, source_sha256 = collection_texts(plan, collection)
@@ -183,12 +202,16 @@ def main() -> None:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--ampere", action="store_true")
+    parser.add_argument("--towns", choices=["plain-and-instructed", "instructed"])
     arguments = parser.parse_args()
     plan = FixPlan.model_validate_json(arguments.config.read_bytes())
     models = [entry for entry in plan.models if entry.model_id == arguments.model]
     if not models:
         raise ValueError("Model is outside the fix plan.")
-    extract_instructed(plan, models[0], "cuda" if arguments.ampere else "cpu")
+    jobs = (
+        standard_jobs(plan) if arguments.towns is None else town_jobs(arguments.towns)
+    )
+    extract_instructed(plan, models[0], "cuda" if arguments.ampere else "cpu", jobs)
 
 
 if __name__ == "__main__":
