@@ -30,15 +30,16 @@ Small towns (1,000-4,999 people, not in `cities5000` or `cities15000`, unique te
 | 3362411 (array 0-1) | Parity against the model card's Transformers example: octen-8b, and qwen3-8b-embedding as control | Both passed (0.9999999) | |
 | 3362220 | Refactor check: fresh-v1 check part rerun into `outputs/refactor-checks/` | Cancelled at once: submitted with failure-only email, resubmitted with all notifications | 0:00 |
 | 3362223 | Same, resubmitted | Completed. All 306 rows equal `outputs/fresh-v1/check/scores.jsonl` in kNN gain, rho, town counts and fusion layers, so the generalized scorer reproduces fresh-v1 | 45:26 |
-| 3362618 (array 0-3) | Extraction, `fix-v2-dev.json` standard jobs (plain and geographic cities and stations, STS validation): qwen3-4b-embedding, harrier-0.6b, octen-8b, nemotron-8b | Submitted | |
-| 3362619 (array 0-3) | Same with `fix-generic-v2-dev.json` (similarity instruction) | Submitted | |
-| 3362620 (array 0-3) | Towns and small towns, plain and geographic (`--towns plain-and-instructed`) | Submitted | |
-| 3362621 (array 0-3) | Towns and small towns, similarity instruction | Submitted | |
-| 3362622 (array 0-2) | Small towns for e5-mistral, bge-multilingual-gemma2, qwen3-8b-embedding with `fix-v1.json` | Submitted | |
-| 3362623 (array 0-2) | Same with `fix-generic-v1-dev.json` | Submitted | |
+| 3362618 (array 0-3) | Extraction, `fix-v2-dev.json` standard jobs (plain and geographic cities and stations, STS validation): qwen3-4b-embedding, harrier-0.6b, octen-8b, nemotron-8b | Completed; logs clean | 0:03:53-0:29:31 |
+| 3362619 (array 0-3) | Same with `fix-generic-v2-dev.json` (similarity instruction) | Completed; logs clean | 0:03:24-0:26:00 |
+| 3362620 (array 0-3) | Towns and small towns, plain and geographic (`--towns plain-and-instructed`) | Completed; logs clean | 0:06:20-0:43:56 |
+| 3362621 (array 0-3) | Towns and small towns, similarity instruction | Completed; logs clean | 0:03:05-0:22:34 |
+| 3362622 (array 0-2) | Small towns for e5-mistral, bge-multilingual-gemma2, qwen3-8b-embedding with `fix-v1.json` | Completed; logs clean | 0:29:52-0:34:40 |
+| 3362623 (array 0-2) | Same with `fix-generic-v1-dev.json` | Completed; logs clean | 0:14:43-0:18:06 |
 | 3362624 | harrier-27b on one H200 (`short`, 320 GB): parity, then all four extraction steps in sequence | Submitted | |
-| 3363090 (array 0-2) | Search features (documents, check and test queries; plain and geographic) for e5-mistral, bge-gemma2, qwen3-8b with `fix-v1.json` | Submitted | |
-| 3363091 (array 0-3) | Same for qwen3-4b, harrier-0.6b, octen-8b, nemotron-8b with `fix-v2-dev.json` | Submitted | |
-| 3363092 (array 0-5) | Web-search-instruction queries (`search-instruction-v1.json`) for the six runnable instruction models | Submitted | |
+| 3363090 (array 0-2) | Search features (documents, check and test queries; plain and geographic) for e5-mistral, bge-gemma2, qwen3-8b with `fix-v1.json` | Completed; logs clean | 0:14:19-0:17:51 |
+| 3363091 (array 0-3) | Same for qwen3-4b, harrier-0.6b, octen-8b, nemotron-8b with `fix-v2-dev.json` | Completed; logs clean | 0:01:45-0:15:06 |
+| 3363092 (array 0-5) | Web-search-instruction queries (`search-instruction-v1.json`) for the six runnable instruction models | Completed; logs clean | 0:00:15-0:00:39 |
 | 3363093 | harrier-27b search features on one H200 | Submitted | |
 | 3363197 | harrier-27b on 4 gtml L40S, fp32 spread over GPUs (`spread_over_gpus`): parity, then all extraction steps. Starts after the L40S arrays; whichever of this and the H200 jobs finishes first is used | Submitted | |
+| 3378323 (array 0-2) | Early validation without harrier-27b, on copies in `outputs/early-checks/`: `fix_baselines`, `fresh_places --part check`, `station_search --part check` | Submitted | |
