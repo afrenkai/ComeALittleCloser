@@ -14,10 +14,9 @@ The same day, two further analyses were frozen and tested once each:
 
 | Branch | What it holds | Status |
 |---|---|---|
-| `master` | Everything tested so far: explorer, location experiments, layer probes, reflected geography, the coordinate-free fix, the paper results section (PRs #4 and #5) | default branch |
-| `research/fresh-places` | Fresh held-out towns: loader, extraction, scoring, freeze and test results (fresh-v1); paper update | done; ready for PR |
+| `master` | Everything tested so far: explorer, location experiments, layer probes, reflected geography, the coordinate-free fix, its baselines, the fresh-towns test, and the full paper draft (PRs #4-#7) | default branch |
 
-All older research branches, including `research/fix-baselines` (PR #6), were merged and deleted on 2026-11-04.
+All research branches, including `research/fix-baselines` (PR #6) and `research/fresh-places` (PR #7), were merged and deleted by 2026-11-05.
 
 ## The question
 

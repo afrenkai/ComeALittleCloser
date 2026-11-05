@@ -34,7 +34,7 @@ Follow the user's Python style rules and run Python through `uv`.
 - Distinguish coordinate controls, preprocessing observations, and learned-model results.
 - Check Python changes with Ruff, Black, and focused tests.
 - Formalize mathematical definitions and theorems in `formal/`; check with `lake build ComeCloser`.
-- Compile the proposal from `paper/` and preserve eight pages including references.
+- Compile the proposal from `paper/` and preserve eight pages including references. The full paper draft is `paper/final.tex`; on BC compile it with pdflatex and bibtex (latexmk is not installed).
 - Do not claim annotation, audio collection, or model evaluation has happened unless there is an actual recorded run.
 - Start here: `docs/PROGRESS.md` is the current state of the project (results, open issues, next steps, owners); `experiments/LAYERS_RUNS.md` is the authoritative run log. Read both before changing experiments.
 - Held-out test discipline (layer probes): the test split was used once, under `experiments/layers-v7.json` (2026-11-04); its frozen claims and results are `docs/FREEZE.md` and `experiments/LAYERS_V7_CLAIMS.md`. Further analysis of those outputs is post hoc. `--mode final` runs once per model, only for cells frozen in the plan's `final_cells` and recorded in `experiments/LAYERS_RUNS.md` before the run. Never delete, move, or redirect outputs to rerun final mode, and never pick settings after seeing test results. The same held-out cities were then used once each for two more frozen claim sets:
