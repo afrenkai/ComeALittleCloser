@@ -24,6 +24,7 @@ type FixCollection = Literal[
     "small-towns-name-country",
 ]
 type FreshPart = Literal["check", "test"]
+type ScoredSet = Literal["cities", "towns", "small-towns"]
 type TownExtraction = Literal["plain-and-instructed", "instructed"]
 type FixMethod = Literal[
     "cosine",
@@ -141,10 +142,35 @@ class BaselinePlan(BaseModel):
     feuerstein_weights: list[float] = [0.2, 1.0]
 
 
-class FreshPlan(BaseModel):
-    """Fresh held-out towns, scored with components fit on the original training cities.
+class PlanPair(BaseModel):
+    """A geographic-instruction plan, its similarity-instruction twin, and the sets
+    their models are scored on."""
 
-    Towns are split once into a check part (pipeline checks) and a test part (run once).
+    fix_plan: Path
+    generic_plan: Path
+    sets: list[ScoredSet]
+
+
+class FreshClaim(BaseModel):
+    """first minus second in city kNN gain, paired by country, CI above 0 in every
+    run of the named models and sets."""
+
+    label: str
+    title: str
+    first: FixMethod
+    second: FixMethod
+    second_weight: float | None = None
+    models: list[str]
+    sets: list[ScoredSet]
+
+
+class FreshPlan(BaseModel):
+    """Held-out places scored with components fit on the original training cities.
+
+    Towns are split once into a check part (pipeline checks) and a test part (run
+    once). For the original cities, the check part is the validation split and the
+    test part the test split. Without explicit claims, G1-G3 of fresh-v1 apply to
+    `claim_models` on `sets`.
     """
 
     experiment_id: str
@@ -157,11 +183,17 @@ class FreshPlan(BaseModel):
     claim_models: list[str]
     feuerstein_weights: list[float] = [0.2, 1.0]
     feuerstein_claim_weight: float = 0.2
+    sets: list[ScoredSet] = ["towns"]
+    extra_pairs: list[PlanPair] = []
+    small_towns_sha256: str | None = None
+    test_caps: dict[ScoredSet, int] = {}
+    claims: list[FreshClaim] = []
 
 
 class TownScore(BaseModel):
     model_id: str
     part: FreshPart
+    scored_set: ScoredSet = "towns"
     split_kind: SplitKind
     seed: int
     method: FixMethod

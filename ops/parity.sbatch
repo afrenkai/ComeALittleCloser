@@ -8,7 +8,8 @@
 #SBATCH --output=outputs/parity-%A_%a.log
 
 # Our pooled output layer vs the model's Sentence Transformers embedding; one task per model.
-# Each argument is "model|pooling|prefix", e.g. "nemotron-8b|mean|passage: ".
+# Each argument is "model|pooling|prefix|extra", e.g. "nemotron-8b|mean|passage: |";
+# extra may be --without-saved-modules.
 # Submit: sbatch -A gtml --array=0-N ops/parity.sbatch "<spec0>" "<spec1>" ...
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:?Submit from the project root}"
@@ -18,5 +19,5 @@ export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 export TOKENIZERS_PARALLELISM=false
 specs=("$@")
-IFS='|' read -r model_id pooling prefix <<< "${specs[$SLURM_ARRAY_TASK_ID]}"
-uv run --locked --offline --no-group cpu --extra ampere -m come_a_little_bit_closer.models.layer_parity --ampere --model "$model_id" --pooling "$pooling" --prefix "$prefix"
+IFS='|' read -r model_id pooling prefix extra <<< "${specs[$SLURM_ARRAY_TASK_ID]}"
+uv run --locked --offline --no-group cpu --extra ampere -m come_a_little_bit_closer.models.layer_parity --ampere --model "$model_id" --pooling "$pooling" --prefix "$prefix" ${extra:-}

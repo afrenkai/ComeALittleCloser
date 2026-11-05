@@ -1,0 +1,177 @@
+{
+  "experiment_id": "models-v1",
+  "fix_plan": "experiments/fix-v2.json",
+  "generic_plan": "experiments/fix-generic-v2.json",
+  "output_directory": "outputs/models-v1",
+  "towns_sha256": "56cf653fa79d1f5682c55231a46dd43b680abeac2d8aaaae3335b6248f4d8442",
+  "small_towns_sha256": "11fa57195c80a0ead0fbcf69b114b2c398571dfaa4b04622acff40c930f327f5",
+  "check_fraction": 0.2,
+  "partition_seed": 20261104,
+  "claim_models": [
+    "e5-mistral",
+    "bge-multilingual-gemma2"
+  ],
+  "feuerstein_weights": [
+    0.2,
+    1.0
+  ],
+  "feuerstein_claim_weight": 0.2,
+  "sets": [
+    "cities",
+    "towns",
+    "small-towns"
+  ],
+  "extra_pairs": [
+    {
+      "fix_plan": "experiments/fix-v1.json",
+      "generic_plan": "experiments/fix-generic-v1-dev.json",
+      "sets": [
+        "small-towns"
+      ]
+    }
+  ],
+  "test_caps": {
+    "small-towns": 25000
+  },
+  "claims": [
+    {
+      "label": "P1 qwen3-4b-embedding",
+      "title": "Fix vs cosine",
+      "first": "instruction-fusion-probe",
+      "second": "cosine",
+      "models": [
+        "qwen3-4b-embedding"
+      ],
+      "sets": [
+        "cities",
+        "towns",
+        "small-towns"
+      ]
+    },
+    {
+      "label": "P1 harrier-0.6b",
+      "title": "Fix vs cosine",
+      "first": "instruction-fusion-probe",
+      "second": "cosine",
+      "models": [
+        "harrier-0.6b"
+      ],
+      "sets": [
+        "cities",
+        "towns",
+        "small-towns"
+      ]
+    },
+    {
+      "label": "P1 harrier-27b",
+      "title": "Fix vs cosine",
+      "first": "instruction-fusion-probe",
+      "second": "cosine",
+      "models": [
+        "harrier-27b"
+      ],
+      "sets": [
+        "cities",
+        "towns",
+        "small-towns"
+      ]
+    },
+    {
+      "label": "P1 octen-8b",
+      "title": "Fix vs cosine",
+      "first": "instruction-fusion-probe",
+      "second": "cosine",
+      "models": [
+        "octen-8b"
+      ],
+      "sets": [
+        "cities",
+        "towns",
+        "small-towns"
+      ]
+    },
+    {
+      "label": "P1 nemotron-8b",
+      "title": "Fusion and probe vs cosine (no native instruction)",
+      "first": "fusion-probe",
+      "second": "cosine",
+      "models": [
+        "nemotron-8b"
+      ],
+      "sets": [
+        "cities",
+        "towns",
+        "small-towns"
+      ]
+    },
+    {
+      "label": "P2 qwen3-4b-embedding",
+      "title": "Geographic vs similarity instruction, both with fusion and probe",
+      "first": "instruction-fusion-probe",
+      "second": "generic-instruction-fusion-probe",
+      "models": [
+        "qwen3-4b-embedding"
+      ],
+      "sets": [
+        "cities",
+        "towns",
+        "small-towns"
+      ]
+    },
+    {
+      "label": "P2 harrier-0.6b",
+      "title": "Geographic vs similarity instruction, both with fusion and probe",
+      "first": "instruction-fusion-probe",
+      "second": "generic-instruction-fusion-probe",
+      "models": [
+        "harrier-0.6b"
+      ],
+      "sets": [
+        "cities",
+        "towns",
+        "small-towns"
+      ]
+    },
+    {
+      "label": "P2 harrier-27b",
+      "title": "Geographic vs similarity instruction, both with fusion and probe",
+      "first": "instruction-fusion-probe",
+      "second": "generic-instruction-fusion-probe",
+      "models": [
+        "harrier-27b"
+      ],
+      "sets": [
+        "cities",
+        "towns",
+        "small-towns"
+      ]
+    },
+    {
+      "label": "P2 octen-8b",
+      "title": "Geographic vs similarity instruction, both with fusion and probe",
+      "first": "instruction-fusion-probe",
+      "second": "generic-instruction-fusion-probe",
+      "models": [
+        "octen-8b"
+      ],
+      "sets": [
+        "cities",
+        "towns",
+        "small-towns"
+      ]
+    },
+    {
+      "label": "P3",
+      "title": "Fix vs cosine on towns of 1,000-4,999 people",
+      "first": "instruction-fusion-probe",
+      "second": "cosine",
+      "models": [
+        "e5-mistral",
+        "bge-multilingual-gemma2"
+      ],
+      "sets": [
+        "small-towns"
+      ]
+    }
+  ]
+}
