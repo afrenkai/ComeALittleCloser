@@ -13,24 +13,27 @@ from come_a_little_bit_closer.evaluation.layer_extract import (
 )
 from come_a_little_bit_closer.models.hidden_states import LayerExtractor
 from come_a_little_bit_closer.models.layer_catalog import find_layer_model
-from come_a_little_bit_closer.models.layer_schemas import ParityResult
+from come_a_little_bit_closer.models.layer_schemas import LayerModelSpec, ParityResult
 
 
 def unit_rows(values: np.ndarray) -> np.ndarray:
     return values / np.linalg.norm(values, axis=1, keepdims=True)
 
 
-def card_reference(
-    checkpoint: str, revision: str, texts: list[str], device: str
-) -> np.ndarray:
+def card_reference(spec: LayerModelSpec, texts: list[str], device: str) -> np.ndarray:
     """Last-token embeddings as in the model card's Transformers example: left
     padding, the tokenizer's own special tokens, the final position."""
     tokenizer = AutoTokenizer.from_pretrained(
-        checkpoint, revision=revision, padding_side="left"
+        spec.checkpoint, revision=spec.revision, padding_side="left"
     )
     model = AutoModel.from_pretrained(
-        checkpoint, revision=revision, dtype=torch.float32
-    ).to(device)
+        spec.checkpoint,
+        revision=spec.revision,
+        dtype=torch.float32,
+        device_map="auto" if spec.spread_over_gpus else None,
+    )
+    if not spec.spread_over_gpus:
+        model.to(device)
     model.eval()
     batches = []
     for start in range(0, len(texts), 8):
@@ -87,9 +90,7 @@ def check_parity(
             reference.encode(texts, prompt="", batch_size=8, convert_to_numpy=True)
         )
     else:
-        theirs = unit_rows(
-            card_reference(spec.checkpoint, spec.revision, texts, device)
-        )
+        theirs = unit_rows(card_reference(spec, texts, device))
     cosines = (ours * theirs).sum(axis=1)
     return ParityResult(
         model_id=model_id,
