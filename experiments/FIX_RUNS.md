@@ -171,5 +171,6 @@ These answer reviewer questions about fix-v1. Everything here is validation only
 
 | Job | Role | Outcome | Elapsed |
 | --- | --- | --- | --- |
-| 3331578 (array 0-2) | Similarity-instruction extraction (cities, stations, STS dev plain and instructed) for e5-mistral, bge-gemma2, qwen3-8b-embedding; gtml L40S | Submitted | |
-| 3331775 | `fix_baselines --config experiments/fix-baselines-v1-dev.json`, on `gtml`, `afterok:3331578` | Submitted | |
+| 3331578 (array 0-2) | Similarity-instruction extraction (cities, stations, STS dev plain and instructed) for e5-mistral, bge-gemma2, qwen3-8b-embedding; gtml L40S | Completed | 18:54-19:14 |
+| 3331775 | `fix_baselines --config experiments/fix-baselines-v1-dev.json`, on `gtml`, `afterok:3331578` | Failed after the first model's first split. Feuerstein positions for items beyond the training extremes had longitudes outside ±180°, which the coordinate check rejects; latitude was already clamped. Fixed by clamping longitude too (min-max mapping, no wrap-around). No results were written | 3:39 |
+| 3333493 | Baselines, resubmitted with the clamp | Submitted | |

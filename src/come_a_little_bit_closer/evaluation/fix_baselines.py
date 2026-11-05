@@ -76,7 +76,10 @@ def fit_feuerstein(
 
 
 def feuerstein_positions(vectors: UnitMatrix, mapping: FeuersteinMap) -> UnitMatrix:
-    """Axis scores min-max scaled to the training coordinate range, as in their maps."""
+    """Axis scores min-max scaled to the training coordinate range, as in their maps.
+
+    Items beyond the training extremes are clamped to valid coordinates.
+    """
     scaled = (vectors @ mapping.axes.T - mapping.projection_low) / (
         mapping.projection_high - mapping.projection_low
     )
@@ -84,6 +87,7 @@ def feuerstein_positions(vectors: UnitMatrix, mapping: FeuersteinMap) -> UnitMat
         mapping.coordinate_high - mapping.coordinate_low
     )
     latlon[:, 0] = np.clip(latlon[:, 0], -90, 90)
+    latlon[:, 1] = np.clip(latlon[:, 1], -180, 180)
     return spherical_vectors(latlon).astype(np.float32)
 
 
