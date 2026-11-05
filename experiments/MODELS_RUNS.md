@@ -29,7 +29,7 @@ Small towns (1,000-4,999 people, not in `cities5000` or `cities15000`, unique te
 | 3362053 (array 0-1) | Parity: octen-8b with Sentence Transformers' Transformer and Pooling modules; nemotron-8b (mean, `passage: `) | Nemotron passed (0.9999999). Octen reference mismatched (min 0.566): the module-built reference applies Octen's chat template, which the card's usage does not. Replaced by the card's Transformers example | 0:24-0:26 |
 | 3362411 (array 0-1) | Parity against the model card's Transformers example: octen-8b, and qwen3-8b-embedding as control | Both passed (0.9999999) | |
 | 3362220 | Refactor check: fresh-v1 check part rerun into `outputs/refactor-checks/` | Cancelled at once: submitted with failure-only email, resubmitted with all notifications | 0:00 |
-| 3362223 | Same, resubmitted | Submitted | |
+| 3362223 | Same, resubmitted | Completed. All 306 rows equal `outputs/fresh-v1/check/scores.jsonl` in kNN gain, rho, town counts and fusion layers, so the generalized scorer reproduces fresh-v1 | 45:26 |
 | 3362618 (array 0-3) | Extraction, `fix-v2-dev.json` standard jobs (plain and geographic cities and stations, STS validation): qwen3-4b-embedding, harrier-0.6b, octen-8b, nemotron-8b | Submitted | |
 | 3362619 (array 0-3) | Same with `fix-generic-v2-dev.json` (similarity instruction) | Submitted | |
 | 3362620 (array 0-3) | Towns and small towns, plain and geographic (`--towns plain-and-instructed`) | Submitted | |
