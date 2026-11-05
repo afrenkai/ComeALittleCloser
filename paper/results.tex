@@ -1,6 +1,6 @@
 % Results section. Meant to be \input into the final paper.
 % Sources of truth: docs/FREEZE.md, experiments/LAYERS_V7_CLAIMS.md (H1--H6, test),
-% experiments/LAYERS_RUNS.md (validation), docs/REFLECTED_FREEZE.md,
+% experiments/LAYERS_RUNS.md (validation), docs/FRESH_FREEZE.md, experiments/FRESH_V1_RESULTS.md, docs/REFLECTED_FREEZE.md,
 % experiments/REFLECTED_V1_RESULTS.md (R1--R4, test), experiments/REFLECTED_RUNS.md
 % (validation findings 1--12). Every number below is copied from those files.
 \providecommand{\todo}[1]{\textbf{[TODO:~#1]}}
@@ -289,3 +289,43 @@ Seed-pair axes, within country & 0.149 & 0.114 & 0.122 & 0.415 & 0.129 & 0.110 &
 \emph{Every component helps, and the instruction helps most.} Alone, the geographic instruction adds $+0.066$ to $+0.090$ over cosine (RI). Adding fusion to instruction and probe adds $+0.005$ to $+0.038$, and adding the probe to instruction and fusion adds $+0.002$ to $+0.027$; each interval is above zero in 15 of 18 runs, and the misses are Qwen3-Embedding-8B and one e5-mistral run. Without an instruction, fusion and probe together add $+0.024$ to $+0.076$. Fusion raises genre agreement ($+0.011$ to $+0.030$); the probe lowers it ($-0.015$ to $-0.028$) while raising station kNN gain ($+0.004$ to $+0.024$).
 
 \emph{Seed-pair coordinate axes do not improve within-country neighbours.} Alone, the latitude and longitude axes rank cities far worse than cosine (0.03--0.15) and lose genre information. Blended at $w=0.2$, the global axes never beat cosine, and the within-country axes add at most $+0.019$ (bge-multilingual-gemma2, SB); at $w=1$ both lower it. This matches the 3-D probe result above: a linear coordinate readout is less locally accurate than cosine already is. We paired every training city rather than two seeds, which should only help the axes, and \citet{feuerstein2026recovering} did not propose them for retrieval.
+
+\subsection{Fresh held-out towns}
+\label{sec:res-fresh}
+
+Because the test cities had been used three times, we tested the fix and the two baseline findings once more on places no analysis had touched (Section~\ref{sec:method-fresh}). Absolute gains are lower on these small towns, as we expected in advance, but the main comparisons keep their sign and roughly their size (Table~\ref{tab:fresh}).
+
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\caption{Fresh held-out towns (test part, run once). Within-country kNN gain on 24,378 GeoNames towns of 5,000--14,999 people in 85 countries (RI) and on towns outside each split's training blocks (SB, 34--53 countries). All components are fit on the original training cities. Means over three seeds.}
+\label{tab:fresh}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+& \multicolumn{2}{c}{e5-mistral} & \multicolumn{2}{c}{bge-multilingual-gemma2} & \multicolumn{2}{c}{Qwen3-Embedding-8B} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+Method & RI & SB & RI & SB & RI & SB \\
+\midrule
+Cosine (output) & 0.172 & 0.207 & 0.152 & 0.184 & 0.072 & 0.094 \\
+Similarity instruction & 0.121 & 0.147 & 0.111 & 0.132 & 0.050 & 0.063 \\
+Geography instruction & 0.235 & 0.271 & 0.192 & 0.230 & 0.122 & 0.152 \\
+Fusion + probe & 0.226 & 0.257 & 0.220 & 0.250 & 0.093 & 0.117 \\
+Sim.\ instr.\ + fusion + probe & 0.181 & 0.209 & 0.203 & 0.227 & 0.082 & 0.100 \\
+Geo.\ instr.\ + fusion + probe (fix) & \textbf{0.270} & \textbf{0.303} & \textbf{0.267} & \textbf{0.299} & \textbf{0.139} & \textbf{0.167} \\
+Seed-pair axes, within country ($w=0.2$) & 0.184 & 0.217 & 0.173 & 0.197 & 0.071 & 0.095 \\
+\midrule
+Geocoder oracle ($w=0.2$) & 0.213 & 0.253 & 0.182 & 0.221 & 0.130 & 0.162 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All three frozen claims held in all twelve runs (e5-mistral and bge-multilingual-gemma2, two splits, three seeds):
+\begin{itemize}
+\item \textbf{G1.} The fix beats plain cosine by $+0.084$ to $+0.135$; the lowest interval bound is $+0.057$.
+\item \textbf{G2.} With fusion and probe on both, the geographic instruction beats the similarity instruction by $+0.057$ to $+0.109$ (lowest bound $+0.043$). The similarity instruction alone again lowers geography below the uninstructed vector in every model and split.
+\item \textbf{G3.} The fix beats the within-country seed-pair axes blended with cosine by $+0.079$ to $+0.114$ (lowest bound $+0.057$). The axes add at most $+0.022$ over cosine.
+\end{itemize}
+Qwen3-Embedding-8B, reported descriptively, also clears all three criteria in six of six runs, and the fix beats the geocoder oracle in every model and split.
+
+One component transfers less well. Layer fusion helps in all 18 runs ($+0.006$ to $+0.047$). The distance probe helps bge-multilingual-gemma2 in six of six runs ($+0.008$ to $+0.013$) but e5-mistral in only three and Qwen3-Embedding-8B in none, with differences between $-0.002$ and $+0.005$. On small towns, the instruction and fusion carry the gain.

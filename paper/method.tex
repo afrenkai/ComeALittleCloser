@@ -125,6 +125,27 @@ Each claim names its cells, metric and threshold. A claim that requires an inter
 
 The three claim sets use the same test cities. The later sets are different claims, fixed before their analysis read the test cities, but they were designed after the earlier test results were known. The test cities are therefore no longer fresh, and new claims need new held-out places.
 
+\subsection{Fresh held-out towns}
+\label{sec:method-fresh}
+
+For a final check we built a new held-out set. From GeoNames \texttt{cities5000} (downloaded 4 November 2026) we kept towns that meet all of these conditions:
+\begin{itemize}
+\item absent from our \texttt{cities15000} snapshot;
+\item 5,000--14,999 inhabitants;
+\item a \texttt{name-country} text unique among towns and different from every original city's text, since identical texts get identical vectors.
+\end{itemize}
+This leaves 32,148 towns. A fixed random permutation puts 20\% in a check part, used only to test the pipeline, and 80\% in a test part, scored once.
+
+Nothing is fit on towns. The fusion layer, distance probe and seed-pair axes are fit on the original training cities of each split and seed, exactly as before, and applied unchanged. Random-item scores all test towns. Spatial-block scores only towns outside that split's training blocks.
+
+These towns are a different, less well-known population, so the claims are about generalization to it. We froze three claims for e5-mistral and bge-multilingual-gemma2 before the check part was scored, each requiring a 95\% interval above 0 in all twelve runs:
+\begin{itemize}
+\item \textbf{G1:} the fix beats plain cosine.
+\item \textbf{G2:} the fix beats the same pipeline with the similarity instruction.
+\item \textbf{G3:} the fix beats the within-country seed-pair axes blended at $w=0.2$, their best validation variant.
+\end{itemize}
+STS is not re-tested.
+
 \subsection{Exploratory baselines (validation only)}
 \label{sec:method-baselines}
 

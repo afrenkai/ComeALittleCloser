@@ -33,4 +33,4 @@ Scored towns (countries with at least 30 scored towns):
 | 3343705 (array 0-2) | Town extraction, plain and geographic instruction (`fix-v1.json`, `--towns plain-and-instructed`), e5-mistral, bge-gemma2, qwen3-8b; gtml L40S | Completed; no truncated texts | 15:51 / 16:29 / 14:19 |
 | 3343706 (array 0-2) | Town extraction, similarity instruction (`fix-generic-v1-dev.json`, `--towns instructed`) | Completed | 8:16 / 8:27 / 7:06 |
 | 3343707 | `fresh_places --part check`, `afterok:3343705:3343706`, gtml, 160 GB | Completed (peak 41 GB). Checks passed: all 18 model/split/seed runs scored; town and country counts match the freeze; fusion layers equal fix-baselines-v1-dev's for every model, split and seed | 46:10 |
-| 3349703 | `fresh_places --part test` (once), gtml, 200 GB, 12 h | Submitted | |
+| 3349703 | `fresh_places --part test` (once), gtml, 200 GB, 12 h | Completed (peak 34 GB). G1, G2 and G3 supported in 12 of 12 runs; see `experiments/FRESH_V1_RESULTS.md` | 55:46 |

@@ -8,15 +8,16 @@ The same day, two further analyses were frozen and tested once each:
 
 - **What search uses.** Retrieval models' search vectors reflect within-country geography more than their base models' do. They reach about a third of the way to the true nearest neighbours.
 - **A coordinate-free fix.** An instruction, plus mixing in an earlier layer, plus a small learned distance map, gets search to about half of that ceiling without hurting general text similarity.
+- **Fresh towns (fresh-v1).** On 32,148 new GeoNames towns (5,000-14,999 people) that no analysis had touched, the fix still beats plain search, the geographic wording beats the standard similarity instruction, and the fix beats Feuerstein et al.'s coordinate axes. All three held in every run.
 
 ## Where the code is
 
 | Branch | What it holds | Status |
 |---|---|---|
 | `master` | Everything tested so far: explorer, location experiments, layer probes, reflected geography, the coordinate-free fix, the paper results section (PRs #4 and #5) | default branch |
-| `research/fix-baselines` | Validation-only baselines and ablations for the fix (similarity instruction, factorial ablation, Feuerstein et al. axes) and the full paper draft | done; ready for PR |
+| `research/fresh-places` | Fresh held-out towns: loader, extraction, scoring, freeze and test results (fresh-v1); paper update | done; ready for PR |
 
-All older research branches were merged and deleted on 2026-11-04.
+All older research branches, including `research/fix-baselines` (PR #6), were merged and deleted on 2026-11-04.
 
 ## The question
 
@@ -201,15 +202,16 @@ Honest assessment as of 2026-11-04: a solid workshop paper (e.g. BlackboxNLP) no
 - **Addressed since then (2026-11-04, frozen and tested):**
   - Decodability vs use: search vectors reflect part of the geography (reflected-v1).
   - A cheap fix raises it to about half the ceiling, with no STS cost (fix-v1).
+  - On fresh towns, the fix, the role of the geographic wording, and the gap to Feuerstein et al.'s axes all hold (fresh-v1, G1-G3, 12 of 12 runs each). The distance probe adds little on small towns; fusion and the instruction carry the gain.
 - **Still open:**
   - Encoders are not exactly zero on spatial-block, so the claim is a gap in size, not "none".
   - Encoders and decoders also differ in training objective and data, not just architecture.
   - Against each model's standard similarity instruction, the fix costs Qwen3-8B 0.043 STS (validation); the no-STS-cost claim holds for e5-mistral and bge-gemma2 only.
-  - The held-out test cities have now backed three frozen claim sets (layers-v7, reflected-v1, fix-v1). New claims should be tested on fresh places.
+  - The original test cities have backed three frozen claim sets and the fresh-town test part one. Further claims need yet another held-out set.
 - **Related work to position against** (found 2026-11-04): Feuerstein et al. 2026 (arXiv 2609.05721) recover geography from output embeddings with a few-seed projection and suggest geographic ranking. Their method is the natural baseline for our fix, and our country control is the main difference. Srinivasagan & Georges 2026 (arXiv 2609.00454) add coordinates through training, a contrast. Jiang et al. 2026 (arXiv 2605.12714) compare embedders and base LLMs layer by layer, without geography.
 - **Next for the paper:**
   1. Done (validation, fix-baselines-v1): the geographic wording, not instruction use, drives the gain; every component helps; Feuerstein et al.'s axes do not improve within-country neighbours. See `experiments/FIX_RUNS.md`.
-  2. Get fresh held-out places (for example, GeoNames cities under 15,000 people) for any new claims.
+  2. Done (fresh-v1): G1-G3 supported on fresh towns; see `experiments/FRESH_V1_RESULTS.md`.
   3. Done: full draft in `paper/` (two team TODOs left).
 
 ## Reproducing
