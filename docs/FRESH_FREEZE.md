@@ -1,6 +1,6 @@
-# Fresh-towns freeze list (draft, 2026-11-04)
+# Fresh-towns freeze list (approved 2026-11-04)
 
-**Status: DRAFT, awaiting approval by Tian-hao Zhang.** Written before any town features exist and before the check part is scored. The test part must not run until this file says "approved". Runs are logged in `experiments/FRESH_RUNS.md`.
+**Status: approved by Tian-hao Zhang on 2026-11-04** ("approved"). Written before any town features existed and before the check part was scored; approved while the check jobs were still queued. The test part runs once, after the check part passes its pipeline checks. Runs are logged in `experiments/FRESH_RUNS.md`.
 
 ## Why
 
