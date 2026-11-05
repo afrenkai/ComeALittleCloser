@@ -24,7 +24,7 @@
 - [ ] Remaining retrieval metrics (overlap@10, excess distance, random baseline on station origins) and the layer-by-region map view (see `docs/PROGRESS.md`).
 - [x] Coordinate-free fix (instruction + layer fusion + distance probe); frozen and tested once under fix-v1 (`experiments/FIX_V1_RESULTS.md`).
 - [x] Fix baselines on validation: similarity instruction, factorial ablation, Feuerstein et al. 2026 axes (`experiments/FIX_RUNS.md`, fix-baselines-v1).
-- [ ] Fresh held-out places (e.g. GeoNames cities under 15,000 people) for any new frozen claims.
+- [x] Fresh held-out places: GeoNames towns of 5,000-14,999 people; G1-G3 tested once under fresh-v1 (`experiments/FRESH_V1_RESULTS.md`).
 - [ ] Evaluate H3 candidate recall before using it as a retrieval baseline.
 - [ ] Consider geographic adaptation after the audited controls.
 

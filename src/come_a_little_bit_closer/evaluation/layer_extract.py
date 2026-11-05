@@ -10,7 +10,12 @@ from typing import BinaryIO
 import numpy as np
 import transformers
 
-from come_a_little_bit_closer.data.cities import load_places, place_text
+from come_a_little_bit_closer.data.cities import (
+    load_fresh_towns,
+    load_places,
+    place_text,
+)
+from come_a_little_bit_closer.data.schemas import TownSource
 from come_a_little_bit_closer.evaluation.layer_schemas import (
     DatasetItems,
     FeatureManifest,
@@ -66,6 +71,29 @@ def dataset_items(dataset: LayerDataset, condition: TextCondition) -> DatasetIte
         coordinates=[station.coordinates for station in stations],
         country_codes=[station.country_code for station in stations],
         source_sha256=stats.source_sha256,
+    )
+
+
+def town_items(source: TownSource) -> DatasetItems:
+    towns = load_fresh_towns(source)
+    return DatasetItems(
+        item_ids=[town.place_id for town in towns],
+        texts=[place_text(town, "name-country") for town in towns],
+        coordinates=[town.coordinates for town in towns],
+        country_codes=[town.country_code for town in towns],
+        source_sha256=hashlib.sha256(
+            "".join(
+                hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in [
+                    source.archive,
+                    source.reference_archive,
+                    source.country_info,
+                ]
+            ).encode()
+            + source.model_dump_json(
+                include={"minimum_population", "maximum_population"}
+            ).encode()
+        ).hexdigest(),
     )
 
 
