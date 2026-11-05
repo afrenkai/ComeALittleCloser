@@ -77,8 +77,11 @@ def check_parity(
         reference = SentenceTransformer(
             spec.checkpoint,
             revision=spec.revision,
-            device=device,
-            model_kwargs={"dtype": torch.float32},
+            device=None if spec.spread_over_gpus else device,
+            model_kwargs={
+                "dtype": torch.float32,
+                "device_map": "auto" if spec.spread_over_gpus else None,
+            },
         )
         theirs = unit_rows(
             reference.encode(texts, prompt="", batch_size=8, convert_to_numpy=True)

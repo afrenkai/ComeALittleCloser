@@ -24,6 +24,7 @@ class LayerModelSpec(BaseModel):
     start_token: str | None = None
     end_token: str | None = None
     attention_implementation: Literal["eager"] | None = None
+    spread_over_gpus: bool = False
 
 
 class EncodedBatch(BaseModel):

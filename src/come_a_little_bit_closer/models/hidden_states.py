@@ -81,8 +81,11 @@ class LayerExtractor:
                 dtype=torch.float32,
                 attn_implementation=spec.attention_implementation,
                 trust_remote_code=False,
+                device_map="auto" if spec.spread_over_gpus else None,
             )
-        self.model.to(device).eval()
+        if not spec.spread_over_gpus:
+            self.model.to(device)
+        self.model.eval()
 
     def count_truncated(self, texts: list[str]) -> int:
         if self.spec.architecture == "encoder":
@@ -158,7 +161,9 @@ class LayerExtractor:
                     attention_mask=attention_mask,
                     output_hidden_states=True,
                 )
-            layer_states = [state.float() for state in outputs.hidden_states]
+            layer_states = [
+                state.float().to(self.device) for state in outputs.hidden_states
+            ]
             batch_pooled = {
                 "mean": torch.stack(
                     [mean_pool(state, content_mask) for state in layer_states]

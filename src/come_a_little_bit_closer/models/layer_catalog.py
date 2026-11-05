@@ -194,6 +194,7 @@ def layer_model_specs() -> list[LayerModelSpec]:
             architecture="decoder",
             start_token="<bos>",
             end_token="<eos>",
+            spread_over_gpus=True,
         ),
         LayerModelSpec(
             model_id="octen-8b",
