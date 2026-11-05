@@ -27,6 +27,7 @@ cpu = [
     "torchvision",
 ]
 ampere = [
+    "accelerate>=1.15.0",
     "sentence-transformers[image]>=6.1.0",
     "torch; sys_platform == 'linux'",
     "torchvision; sys_platform == 'linux'",
