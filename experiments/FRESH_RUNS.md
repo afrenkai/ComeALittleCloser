@@ -30,3 +30,6 @@ Scored towns (countries with at least 30 scored towns):
 
 | Job | Role | Outcome | Elapsed |
 | --- | --- | --- | --- |
+| 3343705 (array 0-2) | Town extraction, plain and geographic instruction (`fix-v1.json`, `--towns plain-and-instructed`), e5-mistral, bge-gemma2, qwen3-8b; gtml L40S | Submitted | |
+| 3343706 (array 0-2) | Town extraction, similarity instruction (`fix-generic-v1-dev.json`, `--towns instructed`) | Submitted | |
+| 3343707 | `fresh_places --part check`, `afterok:3343705:3343706`, gtml, 160 GB | Submitted | |
