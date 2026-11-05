@@ -1,0 +1,58 @@
+{
+  "experiment_id": "fix-v2-dev",
+  "layers_plan": "experiments/layers-v5.json",
+  "models": [
+    {
+      "model_id": "qwen3-4b-embedding",
+      "template": "Instruct: {instruction}\nQuery:{text}"
+    },
+    {
+      "model_id": "harrier-0.6b",
+      "template": "Instruct: {instruction}\nQuery: {text}"
+    },
+    {
+      "model_id": "octen-8b",
+      "template": "Instruct: {instruction}\nQuery:{text}"
+    },
+    {
+      "model_id": "nemotron-8b",
+      "template": "query: {instruction}\n{text}",
+      "plain_template": "passage: {text}",
+      "pooling": "mean"
+    },
+    {
+      "model_id": "harrier-27b",
+      "template": "Instruct: {instruction}\nQuery: {text}"
+    }
+  ],
+  "instruction": "Given the name of a place, retrieve places that are geographically closest to it",
+  "instructed_directory": "data/processed/instructed-v2",
+  "output_directory": "outputs/fix-v2-dev",
+  "sts_files": {
+    "dev": "data/raw/stsbenchmark/validation.jsonl.gz"
+  },
+  "sts_sha256": {
+    "dev": "e2cf5a5881c37c44d5de5c5b390834585234acdab4e6e08071c474bf00157783"
+  },
+  "plain_from_layers": false,
+  "split_kinds": [
+    "random-item",
+    "spatial-block"
+  ],
+  "fusion_weight": 1.0,
+  "distance_weight": 0.1,
+  "country_weight": 0.1,
+  "oracle_weight": 0.2,
+  "probe_rank": 32,
+  "probe_steps": 3000,
+  "probe_batch": 2048,
+  "probe_positives": 10,
+  "probe_learning_rate": 0.001,
+  "probe_margin": 1.0,
+  "probe_seed": 0,
+  "layer_sample": 8000,
+  "minimum_cities": 30,
+  "neighbors": 10,
+  "batch_size": 16,
+  "max_length": 256
+}

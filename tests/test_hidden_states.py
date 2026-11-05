@@ -186,7 +186,7 @@ def test_random_init_is_float32_deterministic_and_preserves_global_rng(
 def test_registry_pins_every_revision() -> None:
     specs = layer_model_specs()
     ids = [spec.model_id for spec in specs]
-    assert len(ids) == len(set(ids)) == 19
+    assert len(ids) == len(set(ids)) == 23
     assert all(re.fullmatch("[0-9a-f]{40}", spec.revision) for spec in specs)
     assert find_layer_model("bge-m3").stage == "retrieval"
     assert find_layer_model("qwen3-8b-base").stage == "base"

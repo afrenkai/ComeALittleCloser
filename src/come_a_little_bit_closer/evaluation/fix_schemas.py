@@ -21,6 +21,7 @@ type FixCollection = Literal[
     "sts-dev",
     "sts-test",
     "towns-name-country",
+    "small-towns-name-country",
 ]
 type FreshPart = Literal["check", "test"]
 type TownExtraction = Literal["plain-and-instructed", "instructed"]
@@ -43,15 +44,21 @@ type FixMethod = Literal[
 
 
 class InstructedModel(BaseModel):
-    """A retrieval model and its native instruction format ({instruction}, {text})."""
+    """A retrieval model, its instruction format ({instruction}, {text}), its plain
+    (uninstructed) text format and the pooling it searches with."""
 
     model_id: str
     template: str
+    plain_template: str = "{text}"
+    pooling: Literal["last", "mean"] = "last"
 
     @model_validator(mode="after")
     def template_has_fields(self) -> "InstructedModel":
         if "{instruction}" not in self.template or "{text}" not in self.template:
             raise ValueError("Templates need {instruction} and {text}.")
+        plain = self.plain_template
+        if "{text}" not in plain or "{instruction}" in plain:
+            raise ValueError("Plain templates need {text} and no {instruction}.")
         return self
 
 
@@ -66,6 +73,7 @@ class FixPlan(BaseModel):
     output_directory: Path
     sts_files: dict[Literal["dev", "test"], Path]
     sts_sha256: dict[Literal["dev", "test"], str]
+    plain_from_layers: bool = True
     split_kinds: list[SplitKind] = ["random-item", "spatial-block"]
     fusion_weight: float = Field(default=1.0, ge=0)
     distance_weight: float = Field(default=0.1, ge=0)
@@ -87,6 +95,7 @@ class FixPlan(BaseModel):
 
 class InstructedManifest(BaseModel):
     model_id: str
+    pooling: Literal["last", "mean"] = "last"
     checkpoint: str
     revision: str
     collection: FixCollection

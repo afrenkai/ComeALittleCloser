@@ -86,7 +86,7 @@ def town_items(source: TownSource) -> DatasetItems:
                 hashlib.sha256(path.read_bytes()).hexdigest()
                 for path in [
                     source.archive,
-                    source.reference_archive,
+                    *source.reference_archives,
                     source.country_info,
                 ]
             ).encode()

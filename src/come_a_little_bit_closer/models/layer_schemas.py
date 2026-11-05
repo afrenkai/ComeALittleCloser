@@ -32,3 +32,14 @@ class EncodedBatch(BaseModel):
     input_ids: torch.Tensor
     attention_mask: torch.Tensor
     content_mask: torch.Tensor
+
+
+class ParityResult(BaseModel):
+    """Agreement between our pooled output layer and the model's own embedding."""
+
+    model_id: str
+    pooling: str
+    prefix: str
+    texts: int
+    minimum_cosine: float
+    mean_cosine: float

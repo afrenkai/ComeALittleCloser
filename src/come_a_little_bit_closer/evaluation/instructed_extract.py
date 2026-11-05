@@ -55,8 +55,8 @@ def collection_texts(
     if collection == "stations-metadata":
         items = dataset_items("stations", "metadata")
         return items.item_ids, items.texts, items.source_sha256
-    if collection == "towns-name-country":
-        items = town_items(TownSource())
+    if collection in ["towns-name-country", "small-towns-name-country"]:
+        items = town_items(town_source(collection))
         return items.item_ids, items.texts, items.source_sha256
     split = "dev" if collection == "sts-dev" else "test"
     pairs = read_sts(plan.sts_files[split], plan.sts_sha256[split])
@@ -67,11 +67,36 @@ def collection_texts(
     )
 
 
+def town_source(collection: FixCollection) -> TownSource:
+    """Fresh towns of 5,000-14,999 people, or the smaller band of 1,000-4,999."""
+    if collection == "towns-name-country":
+        return TownSource()
+    return TownSource(
+        archive=Path("data/raw/cities1000.zip"),
+        reference_archives=[
+            Path("data/raw/cities5000.zip"),
+            Path("data/raw/cities15000.zip"),
+        ],
+        minimum_population=1000,
+        maximum_population=5000,
+    )
+
+
+def plan_model(plan: FixPlan, model_id: str) -> InstructedModel:
+    for model in plan.models:
+        if model.model_id == model_id:
+            return model
+    raise ValueError(f"Model is outside the fix plan: {model_id}")
+
+
 def instructed_path(
     plan: FixPlan, model_id: str, collection: FixCollection, instructed: bool
 ) -> Path:
     variant = "instructed" if instructed else "plain"
-    return plan.instructed_directory / model_id / f"{collection}-{variant}-last.npy"
+    pooling = plan_model(plan, model_id).pooling
+    return (
+        plan.instructed_directory / model_id / f"{collection}-{variant}-{pooling}.npy"
+    )
 
 
 def kept_layers(total: int) -> list[int]:
@@ -108,7 +133,9 @@ def already_extracted(
     item_ids, texts, source_sha256 = collection_texts(plan, collection)
     return (
         manifest.instruction == (plan.instruction if instructed else None)
-        and manifest.template == (model.template if instructed else "{text}")
+        and manifest.template
+        == (model.template if instructed else model.plain_template)
+        and manifest.pooling == model.pooling
         and manifest.item_ids == item_ids
         and manifest.source_sha256 == source_sha256
         and manifest.max_length == plan.max_length
@@ -116,22 +143,37 @@ def already_extracted(
 
 
 def standard_jobs(plan: FixPlan) -> list[tuple[FixCollection, bool]]:
+    """Instructed cities and stations, both STS variants, and, for plans whose plain
+    features do not come from the layer extraction, plain cities and stations."""
     sts_collections: dict[str, FixCollection] = {"dev": "sts-dev", "test": "sts-test"}
+    plain: list[tuple[FixCollection, bool]] = (
+        []
+        if plan.plain_from_layers
+        else [("cities-name-country", False), ("stations-metadata", False)]
+    )
+    return (
+        plain
+        + [
+            ("cities-name-country", True),
+            ("stations-metadata", True),
+        ]
+        + [
+            (sts_collections[split], instructed)
+            for split in plan.sts_files
+            for instructed in [False, True]
+        ]
+    )
+
+
+def town_jobs(
+    extraction: TownExtraction, collections: list[FixCollection]
+) -> list[tuple[FixCollection, bool]]:
+    variants = [True] if extraction == "instructed" else [False, True]
     return [
-        ("cities-name-country", True),
-        ("stations-metadata", True),
-    ] + [
-        (sts_collections[split], instructed)
-        for split in plan.sts_files
-        for instructed in [False, True]
+        (collection, instructed)
+        for collection in collections
+        for instructed in variants
     ]
-
-
-def town_jobs(extraction: TownExtraction) -> list[tuple[FixCollection, bool]]:
-    instructed: list[tuple[FixCollection, bool]] = [("towns-name-country", True)]
-    if extraction == "instructed":
-        return instructed
-    return [("towns-name-country", False)] + instructed
 
 
 def extract_instructed(
@@ -141,34 +183,35 @@ def extract_instructed(
     jobs: list[tuple[FixCollection, bool]],
 ) -> list[Path]:
     spec = find_layer_model(model.model_id)
-    if spec.architecture != "decoder":
-        raise ValueError("Instructed extraction uses last-token pooling (decoders).")
+    if model.pooling == "last" and spec.architecture != "decoder":
+        raise ValueError("Last-token pooling needs a decoder.")
     extractor = LayerExtractor(spec, device, plan.max_length)
     written = []
     for collection, instructed in jobs:
         item_ids, raw_texts, source_sha256 = collection_texts(plan, collection)
-        texts = (
-            [
+        texts = [
+            (
                 model.template.format(instruction=plan.instruction, text=text)
-                for text in raw_texts
-            ]
-            if instructed
-            else raw_texts
-        )
+                if instructed
+                else model.plain_template.format(text=text)
+            )
+            for text in raw_texts
+        ]
         path = instructed_path(plan, model.model_id, collection, instructed)
         if already_extracted(path, plan, collection, instructed, model):
             print(f"Already extracted {model.model_id} {collection}", flush=True)
             written.append(path)
             continue
-        features = extractor.extract(texts, plan.batch_size)["last"]
+        features = extractor.extract(texts, plan.batch_size)[model.pooling]
         layers = kept_layers(features.shape[0])
         manifest = InstructedManifest(
             model_id=spec.model_id,
+            pooling=model.pooling,
             checkpoint=spec.checkpoint,
             revision=spec.revision,
             collection=collection,
             instruction=plan.instruction if instructed else None,
-            template=model.template if instructed else "{text}",
+            template=model.template if instructed else model.plain_template,
             source_sha256=source_sha256,
             item_ids=item_ids,
             kept_layers=layers,
@@ -203,15 +246,21 @@ def main() -> None:
     parser.add_argument("--model", required=True)
     parser.add_argument("--ampere", action="store_true")
     parser.add_argument("--towns", choices=["plain-and-instructed", "instructed"])
+    parser.add_argument(
+        "--town-collections",
+        nargs="+",
+        choices=["towns-name-country", "small-towns-name-country"],
+        default=["towns-name-country"],
+    )
     arguments = parser.parse_args()
     plan = FixPlan.model_validate_json(arguments.config.read_bytes())
-    models = [entry for entry in plan.models if entry.model_id == arguments.model]
-    if not models:
-        raise ValueError("Model is outside the fix plan.")
+    model = plan_model(plan, arguments.model)
     jobs = (
-        standard_jobs(plan) if arguments.towns is None else town_jobs(arguments.towns)
+        standard_jobs(plan)
+        if arguments.towns is None
+        else town_jobs(arguments.towns, arguments.town_collections)
     )
-    extract_instructed(plan, models[0], "cuda" if arguments.ampere else "cpu", jobs)
+    extract_instructed(plan, model, "cuda" if arguments.ampere else "cpu", jobs)
 
 
 if __name__ == "__main__":

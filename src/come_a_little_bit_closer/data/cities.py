@@ -52,7 +52,11 @@ def load_fresh_towns(source: TownSource) -> list[Place]:
     Towns whose name-country text equals a reference place's, or another town's,
     are dropped: identical texts get identical vectors.
     """
-    reference = load_places(source.reference_archive, source.country_info)
+    reference = [
+        place
+        for archive in source.reference_archives
+        for place in load_places(archive, source.country_info)
+    ]
     reference_ids = {place.place_id for place in reference}
     reference_texts = {place_text(place, "name-country") for place in reference}
     candidates = [

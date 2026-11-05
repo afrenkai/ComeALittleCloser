@@ -21,12 +21,12 @@ from come_a_little_bit_closer.evaluation.geo_fix import (
     component_scores,
     country_reflections,
     fit_fix,
+    plain_cities,
     unit,
 )
 from come_a_little_bit_closer.evaluation.instructed_extract import read_instructed
 from come_a_little_bit_closer.evaluation.layer_extract import (
     dataset_items,
-    feature_path,
     town_items,
 )
 from come_a_little_bit_closer.evaluation.layer_run import build_split, write_atomic
@@ -100,13 +100,7 @@ def variant_features(
         for array, manifest in pairs
     ):
         raise ValueError("Town and city features keep different layers.")
-    plain_cities = np.asarray(
-        np.load(
-            feature_path(layers, model_id, "cities", "name-country", "last"),
-            mmap_mode="r",
-        )[kept]
-    )
-    variants = {"plain": (plain_cities, plain_towns)}
+    variants = {"plain": (plain_cities(fix, layers, model_id, kept), plain_towns)}
     for variant, pairs in loaded.items():
         variants[variant] = (pairs[0][0], pairs[1][0])
     return variants, kept
