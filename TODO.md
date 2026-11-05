@@ -23,7 +23,7 @@
 - [x] Within-country neighbour metrics for cosine retrieval (Spearman ρ, kNN gain); frozen and tested once under reflected-v1 (`experiments/REFLECTED_V1_RESULTS.md`).
 - [ ] Remaining retrieval metrics (overlap@10, excess distance, random baseline on station origins) and the layer-by-region map view (see `docs/PROGRESS.md`).
 - [x] Coordinate-free fix (instruction + layer fusion + distance probe); frozen and tested once under fix-v1 (`experiments/FIX_V1_RESULTS.md`).
-- [ ] Fix baselines on validation: plain similarity instruction, final-layer-only distance probe, Feuerstein et al. 2026 projection.
+- [x] Fix baselines on validation: similarity instruction, factorial ablation, Feuerstein et al. 2026 axes (`experiments/FIX_RUNS.md`, fix-baselines-v1).
 - [ ] Fresh held-out places (e.g. GeoNames cities under 15,000 people) for any new frozen claims.
 - [ ] Evaluate H3 candidate recall before using it as a retrieval baseline.
 - [ ] Consider geographic adaptation after the audited controls.

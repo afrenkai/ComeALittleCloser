@@ -14,7 +14,7 @@ The same day, two further analyses were frozen and tested once each:
 | Branch | What it holds | Status |
 |---|---|---|
 | `master` | Everything tested so far: explorer, location experiments, layer probes, reflected geography, the coordinate-free fix, the paper results section (PRs #4 and #5) | default branch |
-| `research/fix-baselines` | Validation-only baselines and ablations for the fix (similarity instruction, final-layer-only probe, Feuerstein et al. axes) | in progress |
+| `research/fix-baselines` | Validation-only baselines and ablations for the fix (similarity instruction, factorial ablation, Feuerstein et al. axes) and the full paper draft | done; ready for PR |
 
 All older research branches were merged and deleted on 2026-11-04.
 
@@ -204,13 +204,13 @@ Honest assessment as of 2026-11-04: a solid workshop paper (e.g. BlackboxNLP) no
 - **Still open:**
   - Encoders are not exactly zero on spatial-block, so the claim is a gap in size, not "none".
   - Encoders and decoders also differ in training objective and data, not just architecture.
-  - The fix lacks three baselines: a plain similarity instruction, the distance map on the final layer only, and Feuerstein et al.'s projection.
+  - Against each model's standard similarity instruction, the fix costs Qwen3-8B 0.043 STS (validation); the no-STS-cost claim holds for e5-mistral and bge-gemma2 only.
   - The held-out test cities have now backed three frozen claim sets (layers-v7, reflected-v1, fix-v1). New claims should be tested on fresh places.
 - **Related work to position against** (found 2026-11-04): Feuerstein et al. 2026 (arXiv 2609.05721) recover geography from output embeddings with a few-seed projection and suggest geographic ranking. Their method is the natural baseline for our fix, and our country control is the main difference. Srinivasagan & Georges 2026 (arXiv 2609.00454) add coordinates through training, a contrast. Jiang et al. 2026 (arXiv 2605.12714) compare embedders and base LLMs layer by layer, without geography.
 - **Next for the paper:**
-  1. Run the three missing fix baselines on validation.
+  1. Done (validation, fix-baselines-v1): the geographic wording, not instruction use, drives the gain; every component helps; Feuerstein et al.'s axes do not improve within-country neighbours. See `experiments/FIX_RUNS.md`.
   2. Get fresh held-out places (for example, GeoNames cities under 15,000 people) for any new claims.
-  3. Draft the introduction, method and related work around the results in `paper/results.tex`.
+  3. Done: full draft in `paper/` (two team TODOs left).
 
 ## Reproducing
 

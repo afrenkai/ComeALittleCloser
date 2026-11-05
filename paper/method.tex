@@ -125,7 +125,7 @@ Each claim names its cells, metric and threshold. A claim that requires an inter
 
 The three claim sets use the same test cities. The later sets are different claims, fixed before their analysis read the test cities, but they were designed after the earlier test results were known. The test cities are therefore no longer fresh, and new claims need new held-out places.
 
-\subsection{Exploratory baselines (validation only, in progress)}
+\subsection{Exploratory baselines (validation only)}
 \label{sec:method-baselines}
 
 Three comparisons address open questions about the remedy. They run on validation cities and STS-Benchmark validation only, they are not frozen claims, and they do not read the test cities.
@@ -134,4 +134,4 @@ Three comparisons address open questions about the remedy. They run on validatio
 \item \textbf{Factorial ablation.} Instruction $\times$ layer fusion $\times$ distance probe, all eight combinations. ``Probe'' alone applies the distance probe to the final layer without fusion.
 \item \textbf{Seed-pair axes} \citep{feuerstein2026recovering}. Their axis $d=\sum(p_1-p_2)$ over seed pairs, computed on plain unit-norm output vectors without centring, one axis for latitude and one for longitude. Instead of two seed pairs we pair every training city (upper half against lower half by coordinate), in a global variant and a within-country variant. Axis scores are mapped by min--max scaling to the training coordinate range, turned into positions, and used alone or blended with cosine at $w=0.2$ and $w=1.0$, in the same form as the oracle.
 \end{itemize}
-Their results will be reported, labelled as validation, in Section~\ref{sec:res-closing}.
+Results are reported, labelled as validation, in Section~\ref{sec:res-closing}.

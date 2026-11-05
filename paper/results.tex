@@ -242,11 +242,50 @@ Before running the test we froze two claims for e5-mistral and bge-multilingual-
 
 Within-country neighbour quality rose from 0.20--0.26 to 0.35--0.38, from about one third of the ceiling to about one half. Paired differences were $+0.105$ to $+0.149$, and the lowest interval bound was $+0.084$.
 
-STS did not fall; it rose by 0.013--0.028. This rise is probably an effect of using any instruction rather than geography: the cosine baseline is uninstructed, and both models are usually used with one. For bge-multilingual-gemma2, fusion and probe cost some STS relative to the instruction alone (0.846 vs 0.860). Genre agreement moved by at most 0.016.
+STS did not fall; it rose by 0.013--0.028. This rise is an effect of using any instruction rather than of geography: the cosine baseline is uninstructed, and on validation a similarity instruction raises STS as much (see below). For bge-multilingual-gemma2, fusion and probe cost some STS relative to the instruction alone (0.846 vs 0.860). Genre agreement moved by at most 0.016.
 
 On cities, the fix exceeds a blend with true coordinates ($w=0.2$). On stations, the geocoder remains ahead (0.257 vs 0.231 for e5-mistral; 0.253 vs 0.247 for bge-multilingual-gemma2).
 
 The fix does not transfer for free. Qwen3-Embedding-8B also gains on cities in all six runs ($+0.077$ to $+0.121$), but its station genre agreement falls by about 0.10 and its STS by about 0.02.
 \paragraph{Exploratory baselines (validation).}
-Three comparisons are running on validation cities only (Section~\ref{sec:method-baselines}): a similarity instruction, which separates the any-instruction effect from geography; a factorial ablation of instruction, fusion and probe; and the seed-pair axes of \citet{feuerstein2026recovering}. They are not frozen claims.
-\todo{fix-baselines-v1 results}
+Three comparisons ran on validation cities and STS-Benchmark validation only (Section~\ref{sec:method-baselines}, Table~\ref{tab:baselines}). They are not frozen claims. The four methods shared with the frozen run reproduce its validation scores exactly.
+
+\begin{table}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\caption{Baselines and ablations on validation cities (exploratory; not frozen). City columns are within-country kNN gain for random-item (RI) and spatial-block (SB) splits; Genre is station genre agreement; STS is Spearman correlation on STS-Benchmark validation. Means over three seeds; Genre and STS also over both splits. ``Fusion'' and ``probe'' are fit on training cities as in the frozen fix. Seed-pair axes follow \citet{feuerstein2026recovering}, with every training city paired; blends are $(\cos + w\,\mathrm{sim})/(1+w)$.}
+\label{tab:baselines}
+\begin{tabular}{@{}lcccccccccccc@{}}
+\toprule
+& \multicolumn{4}{c}{e5-mistral} & \multicolumn{4}{c}{bge-multilingual-gemma2} & \multicolumn{4}{c}{Qwen3-Embedding-8B} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}\cmidrule(lr){10-13}
+Method & RI & SB & Genre & STS & RI & SB & Genre & STS & RI & SB & Genre & STS \\
+\midrule
+Cosine (output) & 0.252 & 0.237 & 0.520 & 0.865 & 0.204 & 0.213 & 0.511 & 0.838 & 0.133 & 0.123 & 0.639 & 0.900 \\
+Similarity instruction & 0.182 & 0.180 & 0.582 & 0.894 & 0.153 & 0.169 & 0.615 & 0.862 & 0.056 & 0.077 & 0.670 & 0.933 \\
+Geography instruction & 0.327 & 0.316 & 0.515 & 0.887 & 0.270 & 0.262 & 0.521 & 0.882 & 0.223 & 0.200 & 0.543 & 0.887 \\
+\midrule
+Fusion & 0.304 & 0.285 & 0.563 & 0.882 & 0.240 & 0.258 & 0.582 & 0.852 & 0.158 & 0.141 & 0.647 & 0.908 \\
+Probe & 0.294 & 0.277 & 0.495 & 0.863 & 0.281 & 0.274 & 0.489 & 0.838 & 0.161 & 0.139 & 0.620 & 0.902 \\
+Fusion + probe & 0.312 & 0.297 & 0.537 & 0.881 & 0.280 & 0.287 & 0.543 & 0.856 & 0.170 & 0.147 & 0.623 & 0.909 \\
+Geo.\ instr.\ + fusion & 0.355 & 0.353 & 0.540 & 0.887 & 0.323 & 0.321 & 0.551 & 0.863 & 0.237 & 0.211 & 0.554 & 0.892 \\
+Geo.\ instr.\ + probe & 0.349 & 0.337 & 0.489 & 0.883 & 0.323 & 0.308 & 0.497 & 0.884 & 0.240 & 0.208 & 0.525 & 0.886 \\
+Geo.\ instr.\ + fusion + probe (fix) & \textbf{0.360} & \textbf{0.357} & 0.517 & 0.886 & \textbf{0.344} & \textbf{0.341} & 0.524 & 0.868 & \textbf{0.246} & \textbf{0.216} & 0.537 & 0.890 \\
+Sim.\ instr.\ + fusion + probe & 0.265 & 0.254 & 0.596 & 0.889 & 0.268 & 0.280 & 0.675 & 0.849 & 0.133 & 0.134 & 0.675 & 0.925 \\
+\midrule
+Seed-pair axes, global & 0.054 & 0.052 & 0.161 & 0.421 & 0.034 & 0.035 & 0.147 & 0.449 & 0.041 & 0.037 & 0.143 & 0.425 \\
+Seed-pair axes, within country & 0.149 & 0.114 & 0.122 & 0.415 & 0.129 & 0.110 & 0.123 & 0.429 & 0.080 & 0.048 & 0.144 & 0.490 \\
+\quad blended, global ($w=0.2$) & 0.244 & 0.227 & 0.514 & 0.863 & 0.193 & 0.203 & 0.507 & 0.838 & 0.133 & 0.120 & 0.626 & 0.899 \\
+\quad blended, within country ($w=0.2$) & 0.252 & 0.242 & 0.505 & 0.863 & 0.217 & 0.232 & 0.497 & 0.836 & 0.139 & 0.124 & 0.621 & 0.900 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\emph{The geographic wording, not the use of an instruction, drives the city gain.} The similarity instruction lowers city kNN gain below the uninstructed vector in all three models (e.g.\ Qwen3-Embedding-8B, 0.133 to 0.056 on RI) and raises genre agreement and STS. With fusion and probe on both, the geographic instruction beats the similarity instruction by $+0.058$ to $+0.131$, with every interval above zero (18 of 18 runs, paired by country). It also raises station kNN gain ($+0.04$ to $+0.11$) and lowers genre agreement ($-0.07$ to $-0.15$).
+
+\emph{The STS rise on test is an any-instruction effect.} The similarity instruction raises validation STS over the uninstructed vector by 0.024--0.033, as much as the geographic one does. Against each model's similarity instruction, which is how these models are normally used, the fix changes validation STS by $-0.008$ (e5-mistral), $+0.006$ (bge-multilingual-gemma2) and $-0.043$ (Qwen3-Embedding-8B).
+
+\emph{Every component helps, and the instruction helps most.} Alone, the geographic instruction adds $+0.066$ to $+0.090$ over cosine (RI). Adding fusion to instruction and probe adds $+0.005$ to $+0.038$, and adding the probe to instruction and fusion adds $+0.002$ to $+0.027$; each interval is above zero in 15 of 18 runs, and the misses are Qwen3-Embedding-8B and one e5-mistral run. Without an instruction, fusion and probe together add $+0.024$ to $+0.076$. Fusion raises genre agreement ($+0.011$ to $+0.030$); the probe lowers it ($-0.015$ to $-0.028$) while raising station kNN gain ($+0.004$ to $+0.024$).
+
+\emph{Seed-pair coordinate axes do not improve within-country neighbours.} Alone, the latitude and longitude axes rank cities far worse than cosine (0.03--0.15) and lose genre information. Blended at $w=0.2$, the global axes never beat cosine, and the within-country axes add at most $+0.019$ (bge-multilingual-gemma2, SB); at $w=1$ both lower it. This matches the 3-D probe result above: a linear coordinate readout is less locally accurate than cosine already is. We paired every training city rather than two seeds, which should only help the axes, and \citet{feuerstein2026recovering} did not propose them for retrieval.
