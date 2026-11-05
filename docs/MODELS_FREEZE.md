@@ -75,6 +75,15 @@ A query asks for radio stations of a genre near a town. Genre is matched lexical
 
 Its validation run uses check-part towns and must pass pipeline checks before the test run. No setting of the task is changed after its validation run, except to fix a bug, which would be logged.
 
+**Addendum, 2026-11-05, written after the check-part run and before any test run.** The check run showed one geolocation error dominating some runs:
+
+- Two Dutch pop stations in the catalog have coordinates in Victoria, Seychelles.
+- For several models, the fix ranks them among the top 10 for Dutch pop queries. The Netherlands' gain then falls to about −1.9 and the P5 interval spans −0.5 to +0.1.
+
+55 of the 3,004 stations with a search genre have a nearest `cities15000` place in a different country from their catalog country. These are source data errors, not code bugs. P5 and its verdicts stay exactly as frozen above (`experiments/search-v1.json`).
+
+A sensitivity analysis is added and labelled descriptive and post hoc. `experiments/search-v1-located.json` reruns the same queries, features and methods with these stations removed from the pools. It has no claims and does not change any verdict.
+
 ## What runs
 
 - **Extraction:**

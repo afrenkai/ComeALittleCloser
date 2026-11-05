@@ -285,6 +285,7 @@ class SearchPlan(BaseModel):
     output_directory: Path
     towns_sha256: str
     claim_models: list[str]
+    exclude_mislocated: bool = False
 
 
 class CountrySearch(BaseModel):

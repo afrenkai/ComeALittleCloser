@@ -5,7 +5,7 @@ from collections import Counter
 import numpy as np
 
 from come_a_little_bit_closer.data.cities import load_country_names, load_places
-from come_a_little_bit_closer.data.schemas import Station, TownSource
+from come_a_little_bit_closer.data.schemas import Place, Station, TownSource
 from come_a_little_bit_closer.evaluation.fix_schemas import (
     FreshPart,
     SearchQuery,
@@ -31,11 +31,10 @@ def search_genres(stations: list[Station], source: SearchSource) -> list[str]:
     return sorted(genres, key=lambda genre: (-counts[genre], genre))[: source.genres]
 
 
-def station_documents(stations: list[Station]) -> list[str]:
-    """Station name, the nearest cities15000 place with its country, and genres."""
+def nearest_places(stations: list[Station]) -> list[Place]:
+    """The cities15000 place nearest to each station's coordinates."""
     source = TownSource()
     places = load_places(source.reference_archives[0], source.country_info)
-    countries = load_country_names(source.country_info)
     place_vectors = spherical_vectors(
         np.asarray(
             [
@@ -58,9 +57,16 @@ def station_documents(stations: list[Station]) -> list[str]:
             for start in range(0, len(stations), 1024)
         ]
     )
+    return [places[position] for position in nearest]
+
+
+def station_documents(stations: list[Station]) -> list[str]:
+    """Station name, the nearest cities15000 place with its country, and genres."""
+    countries = load_country_names(TownSource().country_info)
+    places = nearest_places(stations)
     return [
         f"Station: {station.name}\n"
-        f"Location: {places[nearest[position]].name}, "
+        f"Location: {places[position].name}, "
         f"{countries.get(station.country_code, station.country_code)}\n"
         f"Genres: {', '.join(station.genre_tags)}"
         for position, station in enumerate(stations)

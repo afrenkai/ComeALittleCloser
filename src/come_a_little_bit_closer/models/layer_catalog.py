@@ -195,6 +195,7 @@ def layer_model_specs() -> list[LayerModelSpec]:
             start_token="<bos>",
             end_token="<eos>",
             spread_over_gpus=True,
+            feature_dtype="float32",
         ),
         LayerModelSpec(
             model_id="octen-8b",

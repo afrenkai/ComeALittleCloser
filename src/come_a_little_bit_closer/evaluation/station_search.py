@@ -37,6 +37,7 @@ from come_a_little_bit_closer.evaluation.location_schemas import (
 from come_a_little_bit_closer.evaluation.probes import bootstrap_interval
 from come_a_little_bit_closer.evaluation.search_items import (
     catalog_stations,
+    nearest_places,
     search_queries,
 )
 from come_a_little_bit_closer.evaluation.splits import spatial_block, split_indices
@@ -170,6 +171,15 @@ def run_search(config: Path, part: FreshPart) -> Path:
     queries = search_queries(stations, SearchSource(), part)
     collection = "search-queries-check" if part == "check" else "search-queries-test"
     pools = query_pools(queries, stations)
+    if plan.exclude_mislocated:
+        places = nearest_places(stations)
+        located = np.asarray(
+            [
+                places[position].country_code == station.country_code
+                for position, station in enumerate(stations)
+            ]
+        )
+        pools = [pool[located[pool]] for pool in pools]
     station_truth = spherical_vectors(
         np.asarray(
             [
@@ -316,6 +326,16 @@ def search_report(
         " genre in the town's country. Search gain: 1 - mean km to the 10 top-ranked"
         " pool stations / mean km to the pool, averaged per country, then over"
         f" countries. Means over seeds {seeds}.",
+        *(
+            [
+                "",
+                "Descriptive sensitivity: pools exclude stations whose nearest"
+                " cities15000 place lies in another country than their catalog"
+                " country.",
+            ]
+            if plan.exclude_mislocated
+            else []
+        ),
         "",
         "| Model | Split | Method | Queries | Countries | Search gain |",
         "| --- | --- | --- | --- | --- | --- |",
@@ -374,14 +394,15 @@ def search_report(
                 verdicts.append(
                     f"| P5 {model_id} | {above} of {len(lows)} | {verdict} |"
                 )
-    lines[4:4] = [
-        "## Claims",
-        "",
-        "| Claim | Runs with CI above 0 | Verdict |",
-        "| --- | --- | --- |",
-        *verdicts,
-        "",
-    ]
+    if verdicts:
+        lines[4:4] = [
+            "## Claims",
+            "",
+            "| Claim | Runs with CI above 0 | Verdict |",
+            "| --- | --- | --- |",
+            *verdicts,
+            "",
+        ]
     return "\n".join(lines) + "\n"
 
 

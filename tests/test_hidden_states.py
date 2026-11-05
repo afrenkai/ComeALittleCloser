@@ -8,7 +8,7 @@ from transformers import BertConfig, BertModel, BertTokenizerFast
 
 from come_a_little_bit_closer.models.hidden_states import (
     LayerExtractor,
-    checked_float16,
+    checked_features,
     last_token_pool,
     mean_pool,
 )
@@ -45,12 +45,15 @@ def test_last_token_pool_left_and_right_padding() -> None:
     assert torch.equal(last_token_pool(left, left_mask), expected)
 
 
-def test_checked_float16_rejects_overflow() -> None:
-    assert checked_float16(np.array([1.5], dtype=np.float32)).dtype == np.float16
+def test_checked_features_rejects_overflow() -> None:
+    assert checked_features(np.array([1.5], dtype=np.float32), "float16").dtype == (
+        np.float16
+    )
     with pytest.raises(ValueError):
-        checked_float16(np.array([70000.0], dtype=np.float32))
+        checked_features(np.array([70000.0], dtype=np.float32), "float16")
+    assert checked_features(np.array([70000.0], dtype=np.float32), "float32") == 70000
     with pytest.raises(ValueError):
-        checked_float16(np.array([np.nan], dtype=np.float32))
+        checked_features(np.array([np.nan], dtype=np.float32), "float32")
 
 
 VOCAB = [

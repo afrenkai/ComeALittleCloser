@@ -12,7 +12,6 @@ from come_a_little_bit_closer.evaluation.layer_extract import (
 from come_a_little_bit_closer.evaluation.layer_schemas import FeatureManifest, LayerPlan
 from come_a_little_bit_closer.models.hidden_states import (
     LayerExtractor,
-    checked_float16,
 )
 from come_a_little_bit_closer.models.layer_catalog import find_layer_model
 from tests.test_hidden_states import save_tiny_bert, tiny_spec
@@ -40,11 +39,6 @@ def test_layer_plan_parses() -> None:
     assert len(plan.model_ids) == 12
     for model_id in plan.model_ids:
         assert find_layer_model(model_id).model_id == model_id
-
-
-def test_float16_overflow_raises() -> None:
-    with pytest.raises(ValueError):
-        checked_float16(np.array([70000.0], dtype=np.float32))
 
 
 def test_long_text_is_truncated_and_counted(tmp_path: Path) -> None:

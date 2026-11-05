@@ -1,13 +1,13 @@
 import numpy as np
 import torch
 from beartype import beartype
-from jaxtyping import Float16, Float32, jaxtyped
+from jaxtyping import Float, Float32, jaxtyped
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 
 from come_a_little_bit_closer.models.layer_schemas import (
     EncodedBatch,
+    ExtractedFeatures,
     HiddenStates,
-    LayerFeatures,
     LayerModelSpec,
     PooledStates,
     TokenMask,
@@ -34,13 +34,15 @@ def last_token_pool(states: HiddenStates, attention_mask: TokenMask) -> PooledSt
 
 
 @jaxtyped(typechecker=beartype)
-def checked_float16(values: Float32[np.ndarray, "..."]) -> Float16[np.ndarray, "..."]:
+def checked_features(
+    values: Float32[np.ndarray, "..."], dtype: str
+) -> Float[np.ndarray, "..."]:
     if (
         not np.isfinite(values).all()
-        or np.abs(values).max(initial=0) > np.finfo(np.float16).max
+        or np.abs(values).max(initial=0) > np.finfo(dtype).max
     ):
-        raise ValueError("Values are non-finite or exceed the float16 range.")
-    return values.astype(np.float16)
+        raise ValueError(f"Values are non-finite or exceed the {dtype} range.")
+    return values.astype(dtype)
 
 
 class LayerExtractor:
@@ -144,7 +146,9 @@ class LayerExtractor:
         )
 
     @jaxtyped(typechecker=beartype)
-    def extract(self, texts: list[str], batch_size: int) -> dict[str, LayerFeatures]:
+    def extract(
+        self, texts: list[str], batch_size: int
+    ) -> dict[str, ExtractedFeatures]:
         if not texts:
             raise ValueError("extract needs at least one text.")
         order = sorted(range(len(texts)), key=lambda index: len(texts[index]))
@@ -177,7 +181,9 @@ class LayerExtractor:
                 if pooling not in features:
                     features[pooling] = np.empty(
                         (values.shape[0], len(texts), values.shape[2]),
-                        dtype=np.float16,
+                        dtype=self.spec.feature_dtype,
                     )
-                features[pooling][:, positions] = checked_float16(values.cpu().numpy())
+                features[pooling][:, positions] = checked_features(
+                    values.cpu().numpy(), self.spec.feature_dtype
+                )
         return features

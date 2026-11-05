@@ -2,13 +2,14 @@ from typing import Literal
 
 import numpy as np
 import torch
-from jaxtyping import Bool, Float16, Float32
+from jaxtyping import Bool, Float, Float16, Float32
 from pydantic import BaseModel, ConfigDict
 
 type HiddenStates = Float32[torch.Tensor, "batch tokens hidden"]
 type TokenMask = Bool[torch.Tensor, "batch tokens"]
 type PooledStates = Float32[torch.Tensor, "batch hidden"]
 type LayerFeatures = Float16[np.ndarray, "layers items hidden"]
+type ExtractedFeatures = Float[np.ndarray, "layers items hidden"]
 
 
 class LayerModelSpec(BaseModel):
@@ -25,6 +26,7 @@ class LayerModelSpec(BaseModel):
     end_token: str | None = None
     attention_implementation: Literal["eager"] | None = None
     spread_over_gpus: bool = False
+    feature_dtype: Literal["float16", "float32"] = "float16"
 
 
 class EncodedBatch(BaseModel):
