@@ -221,7 +221,7 @@ Honest assessment as of 2026-11-04: a solid workshop paper (e.g. BlackboxNLP) no
   - Encoders are not exactly zero on spatial-block, so the claim is a gap in size, not "none".
   - Encoders and decoders also differ in training objective and data, not just architecture.
   - Against each model's standard similarity instruction, the fix costs Qwen3-8B 0.043 STS (validation); the no-STS-cost claim holds for e5-mistral and bge-gemma2 only.
-  - The original test cities have backed five frozen claim sets, the fresh-town test part three, and the small-town test part three (models-v1, size-v1, search-v2). Further claims need yet another held-out set.
+  - The original test cities have backed five frozen claim sets, the fresh-town test part four (fresh-v1, models-v1, size-v1, search-v1), and the small-town test part three (models-v1, size-v1, search-v2). Further claims need yet another held-out set.
   - Station search passes the strict per-run rule only for the strongest models. The catalog's geolocation errors (247 stations) should be fixed at the source.
 - **Related work to position against** (found 2026-11-04): Feuerstein et al. 2026 (arXiv 2609.05721) recover geography from output embeddings with a few-seed projection and suggest geographic ranking. Their method is the natural baseline for our fix, and our country control is the main difference. Srinivasagan & Georges 2026 (arXiv 2609.00454) add coordinates through training, a contrast. Jiang et al. 2026 (arXiv 2605.12714) compare embedders and base LLMs layer by layer, without geography.
 - **Next for the paper:**

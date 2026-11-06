@@ -30,10 +30,10 @@ Freezing the claims made three failures visible. H3 (``encoders show none'') fai
 \label{sec:limitations}
 
 \paragraph{Reuse of the test sets.}
-The same test cities support five claim sets, and the 5,000--14,999 test towns support three. Each set was fixed before its analysis read them, but the later sets were designed after the earlier results were known, so these tests are no longer fresh.
+The same test cities support five claim sets, the 5,000--14,999 test towns four (one as search origins), and the 1,000--4,999 test towns three (one as search origins). Each set was fixed before its analysis read them, but the later sets were designed after the earlier results were known, so these tests are no longer fresh.
 \begin{itemize}
 \item \textbf{Fresh towns.} We tested the remedy and both baseline findings once more on fresh towns (Section~\ref{sec:res-fresh}). These are a different population, so that test shows generalization to smaller places rather than a clean re-test on large cities.
-\item \textbf{New models.} The new models were evaluated on reused sets with the remedy frozen. This is standard benchmark practice, but weaker evidence than a fresh set. The 1,000--4,999 band was fresh for that evaluation.
+\item \textbf{New models.} The new models were evaluated on reused sets with the remedy frozen. This is standard benchmark practice, but weaker evidence than a fresh set. The 1,000--4,999 band was fresh for that evaluation, and was then reused for the model-size test and as P6 search origins.
 \end{itemize}
 
 \paragraph{Selection on validation and stations.}
