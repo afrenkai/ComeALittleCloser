@@ -2,21 +2,27 @@
 
 A plain-language summary of where the project stands, for the team. Technical run logs live in [`experiments/LAYERS_RUNS.md`](../experiments/LAYERS_RUNS.md); this page explains what they mean.
 
-**Short version.** We built a pipeline that measures, layer by layer, how much geographic information is inside a language model, and ran it on 18 models. Larger decoder models know where a city lies *within its country*, not just which country it is in, and retrieval training (turning a base model into a search-embedding model) does **not** throw that information away. Encoder models (XLM-R, E5, BGE-M3, and the 3.5B XLM-R XL) show at most a small amount. On 2026-11-04 we ran the held-out **test** split once, on a list of layers and claims frozen beforehand; the main findings held (see "Test results" below).
+**Short version.** We built a pipeline that measures, layer by layer, how much geographic information is inside a language model, and ran it on 19 models. Larger decoder models know where a city lies *within its country*, not just which country it is in, and retrieval training (turning a base model into a search-embedding model) does **not** throw that information away. Encoder models (XLM-R, E5, BGE-M3, and the 3.5B XLM-R XL) show at most a small amount. On 2026-11-04 we ran the held-out **test** split once, on a list of layers and claims frozen beforehand; the main findings held (see "Test results" below).
 
 The same day, two further analyses were frozen and tested once each:
 
 - **What search uses.** Retrieval models' search vectors reflect within-country geography more than their base models' do. They reach about a third of the way to the true nearest neighbours.
 - **A coordinate-free fix.** An instruction, plus mixing in an earlier layer, plus a small learned distance map, gets search to about half of that ceiling without hurting general text similarity.
 - **Fresh towns (fresh-v1).** On 32,148 new GeoNames towns (5,000-14,999 people) that no analysis had touched, the fix still beats plain search, the geographic wording beats the standard similarity instruction, and the fix beats Feuerstein et al.'s coordinate axes. All three held in every run.
+- **More models, smaller towns, size and search (2026-11-05/06).**
+  - **Other teams' models.** The frozen fix carries over to retrieval models from other teams that are large enough: harrier-27B, Octen-8B and Nemotron-8B pass in every run.
+  - **Size.** The fix's gain grows with model size, as predicted in advance, and is near zero at 0.6B.
+  - **Smaller towns.** It still helps for towns of 1,000-4,999 people.
+  - **Station search.** The fix beats each model's standard web-search use on average in every run once mislocated stations are removed. It passes the strict every-run test only for harrier-27B and e5-mistral.
+  - Details are in "More models, smaller towns, model size and station search" below.
 
 ## Where the code is
 
 | Branch | What it holds | Status |
 |---|---|---|
-| `master` | Everything tested so far: explorer, location experiments, layer probes, reflected geography, the coordinate-free fix, its baselines, the fresh-towns test, and the full paper draft (PRs #4-#7) | default branch |
+| `master` | Everything tested so far: explorer, location experiments, layer probes, reflected geography, the coordinate-free fix, its baselines, the fresh-towns test, the new models, model size and station search (Path B), and the full paper draft (PRs #4-#9) | default branch |
 
-All research branches, including `research/fix-baselines` (PR #6) and `research/fresh-places` (PR #7), were merged and deleted by 2026-11-05.
+All research branches, including `research/fix-baselines` (PR #6), `research/fresh-places` (PR #7) and `research/more-models` (PR #9), have been merged and deleted; the last on 2026-11-06.
 
 ## The question
 
@@ -173,7 +179,7 @@ The one-page update is [`paper/update/TeamN.tex`](../paper/update/TeamN.tex) (PD
 
 ## More models, smaller towns, model size and station search (2026-11-05/06)
 
-Branch `research/more-models`; log [`experiments/MODELS_RUNS.md`](../experiments/MODELS_RUNS.md), results [`experiments/MODELS_V1_RESULTS.md`](../experiments/MODELS_V1_RESULTS.md). Claims were frozen in [`docs/MODELS_FREEZE.md`](MODELS_FREEZE.md), [`docs/SIZE_FREEZE.md`](SIZE_FREEZE.md) and [`docs/SEARCH_V2_FREEZE.md`](SEARCH_V2_FREEZE.md), and each test ran once.
+Merged in PR #9 (2026-11-06); log [`experiments/MODELS_RUNS.md`](../experiments/MODELS_RUNS.md), results [`experiments/MODELS_V1_RESULTS.md`](../experiments/MODELS_V1_RESULTS.md). Claims were frozen in [`docs/MODELS_FREEZE.md`](MODELS_FREEZE.md), [`docs/SIZE_FREEZE.md`](SIZE_FREEZE.md) and [`docs/SEARCH_V2_FREEZE.md`](SEARCH_V2_FREEZE.md), and each test ran once.
 
 - **Five new retrieval models** with the frozen fix: Qwen3-Embedding-4B, harrier-oss-v1 0.6B and 27B, Octen-Embedding-8B and Nemotron-3-Embed-8B. They were scored on the test cities, the fresh-v1 towns and a new band of 1,000-4,999 towns.
   - P1 is supported (18 of 18) for harrier-27b, octen-8b and nemotron-8b. qwen3-4b reaches 16 of 18, with every run positive, and harrier-0.6b 6 of 18.
