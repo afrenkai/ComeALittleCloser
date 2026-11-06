@@ -8,13 +8,14 @@ from pathlib import Path
 import numpy as np
 import transformers
 
-from come_a_little_bit_closer.data.schemas import TownSource
+from come_a_little_bit_closer.data.schemas import SmallTownSource, TownSource
 from come_a_little_bit_closer.evaluation.fix_schemas import (
     FixCollection,
     FixPlan,
     InstructedManifest,
     InstructedModel,
     SearchSource,
+    SmallSearchSource,
     StsPairs,
     TownExtraction,
 )
@@ -73,11 +74,16 @@ def collection_texts(
             documents,
             text_checksum(documents),
         )
-    if collection in ["search-queries-check", "search-queries-test"]:
+    if collection in [
+        "search-queries-check",
+        "search-queries-test",
+        "small-search-queries-check",
+        "small-search-queries-test",
+    ]:
         queries = search_queries(
             catalog_stations(),
-            SearchSource(),
-            "check" if collection == "search-queries-check" else "test",
+            SmallSearchSource() if collection.startswith("small-") else SearchSource(),
+            "check" if collection.endswith("-check") else "test",
         )
         texts = [query.text for query in queries]
         return [query.query_id for query in queries], texts, text_checksum(texts)
@@ -94,15 +100,7 @@ def town_source(collection: FixCollection) -> TownSource:
     """Fresh towns of 5,000-14,999 people, or the smaller band of 1,000-4,999."""
     if collection == "towns-name-country":
         return TownSource()
-    return TownSource(
-        archive=Path("data/raw/cities1000.zip"),
-        reference_archives=[
-            Path("data/raw/cities5000.zip"),
-            Path("data/raw/cities15000.zip"),
-        ],
-        minimum_population=1000,
-        maximum_population=5000,
-    )
+    return SmallTownSource()
 
 
 def plan_model(plan: FixPlan, model_id: str) -> InstructedModel:
@@ -285,6 +283,8 @@ def main() -> None:
             "search-documents",
             "search-queries-check",
             "search-queries-test",
+            "small-search-queries-check",
+            "small-search-queries-test",
         ],
         default=["towns-name-country"],
     )

@@ -60,6 +60,17 @@ def nearest_places(stations: list[Station]) -> list[Place]:
     return [places[position] for position in nearest]
 
 
+def located_mask(stations: list[Station]) -> np.ndarray:
+    """True where a station's nearest cities15000 place lies in its catalog country."""
+    places = nearest_places(stations)
+    return np.asarray(
+        [
+            places[position].country_code == station.country_code
+            for position, station in enumerate(stations)
+        ]
+    )
+
+
 def station_documents(stations: list[Station]) -> list[str]:
     """Station name, the nearest cities15000 place with its country, and genres."""
     countries = load_country_names(TownSource().country_info)
@@ -78,17 +89,25 @@ def search_queries(
 ) -> list[SearchQuery]:
     """Up to `origins_per_pair` towns of the part per (genre, country) pair whose
     country has at least `minimum_stations` stations of the genre."""
-    towns = town_items(TownSource())
+    towns = town_items(source.towns)
     check, test = holdout_parts(
-        len(towns.item_ids), source.partition_seed, source.check_fraction
+        len(towns.item_ids),
+        source.partition_seed,
+        source.check_fraction,
+        source.test_cap,
     )
     part_rows = check if part == "check" else test
     town_codes = np.asarray(towns.country_codes)
+    counted = (
+        [stations[row] for row in np.flatnonzero(located_mask(stations))]
+        if source.exclude_mislocated
+        else stations
+    )
     generator = np.random.default_rng(source.sample_seed)
     queries = []
     for genre in search_genres(stations, source):
         per_country = Counter(
-            station.country_code for station in stations if genre in station.genre_tags
+            station.country_code for station in counted if genre in station.genre_tags
         )
         for code in sorted(
             code

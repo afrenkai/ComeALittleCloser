@@ -6,6 +6,7 @@ import numpy as np
 from jaxtyping import Float32
 from pydantic import BaseModel, Field, model_validator
 
+from come_a_little_bit_closer.data.schemas import SmallTownSource, TownSource
 from come_a_little_bit_closer.evaluation.layer_schemas import (
     CountryReflection,
     EvaluationMode,
@@ -25,6 +26,8 @@ type FixCollection = Literal[
     "search-documents",
     "search-queries-check",
     "search-queries-test",
+    "small-search-queries-check",
+    "small-search-queries-test",
 ]
 type FreshPart = Literal["check", "test"]
 type ScoredSet = Literal["cities", "towns", "small-towns"]
@@ -260,6 +263,19 @@ class SearchSource(BaseModel):
     sample_seed: int = 20261104
     partition_seed: int = 20261104
     check_fraction: float = Field(default=0.2, gt=0, lt=1)
+    towns: TownSource = TownSource()
+    test_cap: int | None = None
+    exclude_mislocated: bool = False
+
+
+class SmallSearchSource(SearchSource):
+    """search-v2: small-town origins (the models-v1 test part, capped as there),
+    25 origins per genre and country, and no mislocated stations."""
+
+    origins_per_pair: int = Field(default=25, gt=0)
+    towns: TownSource = SmallTownSource()
+    test_cap: int | None = 25000
+    exclude_mislocated: bool = True
 
 
 class SearchQuery(BaseModel):
@@ -286,6 +302,8 @@ class SearchPlan(BaseModel):
     towns_sha256: str
     claim_models: list[str]
     exclude_mislocated: bool = False
+    origins: Literal["towns", "small-towns"] = "towns"
+    claim_label: str = "P5"
 
 
 class CountrySearch(BaseModel):

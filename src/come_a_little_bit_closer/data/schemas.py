@@ -59,3 +59,15 @@ class TownSource(BaseModel):
     country_info: Path = Path("data/raw/countryInfo.txt")
     minimum_population: int = Field(default=5000, ge=0)
     maximum_population: int = Field(default=15000, gt=0)
+
+
+class SmallTownSource(TownSource):
+    """Towns of 1,000-4,999 people absent from both larger extracts."""
+
+    archive: Path = Path("data/raw/cities1000.zip")
+    reference_archives: list[Path] = [
+        Path("data/raw/cities5000.zip"),
+        Path("data/raw/cities15000.zip"),
+    ]
+    minimum_population: int = Field(default=1000, ge=0)
+    maximum_population: int = Field(default=5000, gt=0)

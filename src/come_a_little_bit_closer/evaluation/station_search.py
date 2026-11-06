@@ -3,10 +3,11 @@ from pathlib import Path
 
 import numpy as np
 
-from come_a_little_bit_closer.data.schemas import Station, TownSource
+from come_a_little_bit_closer.data.schemas import Station
 from come_a_little_bit_closer.evaluation.fix_schemas import (
     CountrySearch,
     FittedFix,
+    FixCollection,
     FixPlan,
     FreshPart,
     ScoreMatrix,
@@ -14,6 +15,7 @@ from come_a_little_bit_closer.evaluation.fix_schemas import (
     SearchQuery,
     SearchScore,
     SearchSource,
+    SmallSearchSource,
 )
 from come_a_little_bit_closer.evaluation.geo_fix import (
     centered_unit,
@@ -37,7 +39,7 @@ from come_a_little_bit_closer.evaluation.location_schemas import (
 from come_a_little_bit_closer.evaluation.probes import bootstrap_interval
 from come_a_little_bit_closer.evaluation.search_items import (
     catalog_stations,
-    nearest_places,
+    located_mask,
     search_queries,
 )
 from come_a_little_bit_closer.evaluation.splits import spatial_block, split_indices
@@ -165,20 +167,21 @@ def run_search(config: Path, part: FreshPart) -> Path:
             raise FileExistsError("Search test results already exist; test runs once.")
         if not (plan.output_directory / "check" / "scores.jsonl").exists():
             raise FileNotFoundError("Run the check part before the test part.")
-    if town_items(TownSource()).source_sha256 != plan.towns_sha256:
+    source = SmallSearchSource() if plan.origins == "small-towns" else SearchSource()
+    if town_items(source.towns).source_sha256 != plan.towns_sha256:
         raise ValueError("Fresh towns differ from the plan's checksum.")
     stations = catalog_stations()
-    queries = search_queries(stations, SearchSource(), part)
-    collection = "search-queries-check" if part == "check" else "search-queries-test"
+    queries = search_queries(stations, source, part)
+    query_collections: dict[tuple[str, FreshPart], FixCollection] = {
+        ("towns", "check"): "search-queries-check",
+        ("towns", "test"): "search-queries-test",
+        ("small-towns", "check"): "small-search-queries-check",
+        ("small-towns", "test"): "small-search-queries-test",
+    }
+    collection = query_collections[(plan.origins, part)]
     pools = query_pools(queries, stations)
-    if plan.exclude_mislocated:
-        places = nearest_places(stations)
-        located = np.asarray(
-            [
-                places[position].country_code == station.country_code
-                for position, station in enumerate(stations)
-            ]
-        )
+    if plan.exclude_mislocated or source.exclude_mislocated:
+        located = located_mask(stations)
         pools = [pool[located[pool]] for pool in pools]
     station_truth = spherical_vectors(
         np.asarray(
@@ -356,7 +359,7 @@ def search_report(
                     f" | {np.mean([run.search_gain for run in runs]):.3f} |"
                 )
     comparisons = [
-        ("P5", "instruction-fusion-probe", "standard"),
+        (plan.claim_label, "instruction-fusion-probe", "standard"),
         ("descriptive", "instruction-cosine", "standard"),
         ("descriptive", "instruction-fusion-probe", "instruction-cosine"),
         ("descriptive", "plain-fusion-probe", "plain-cosine"),
@@ -386,13 +389,13 @@ def search_report(
                         f"| {model_id} | {kind} | {seed}"
                         f" | {mean:+.3f} [{low:+.3f}, {high:+.3f}] |"
                     )
-            if label == "P5" and model_id in plan.claim_models:
+            if label == plan.claim_label and model_id in plan.claim_models:
                 above = sum(low > 0 for low in lows)
                 verdict = (
                     "Supported" if lows and above == len(lows) else "Not supported"
                 )
                 verdicts.append(
-                    f"| P5 {model_id} | {above} of {len(lows)} | {verdict} |"
+                    f"| {label} {model_id} | {above} of {len(lows)} | {verdict} |"
                 )
     if verdicts:
         lines[4:4] = [
