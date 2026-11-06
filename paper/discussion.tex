@@ -14,14 +14,24 @@ Each component uses a different part of what the model already holds. The layer 
 \paragraph{When to use it.}
 The remedy suits a search system that cannot geocode its documents but can re-encode them. On cities it beats a blend with true coordinates at $w=0.2$; on stations the coordinate blend remains ahead (Table~\ref{tab:fixes} and Section~\ref{sec:res-closing}). If coordinates are available, using them is still better. The remedy is also not free for every model. For Qwen3-Embedding-8B it raises city neighbour quality but lowers station genre agreement by about 0.10, so the semantic cost must be checked per model.
 
+\paragraph{It needs a large enough model.}
+The remedy transfers to models it was not built with. It was frozen on e5-mistral, bge-multilingual-gemma2 and Qwen3-Embedding-8B. It then helped harrier-27B, Octen-8B and Nemotron-8B in every run, and Qwen3-4B in every run's mean (Section~\ref{sec:res-more}). It did not help either 0.6B model beyond the original cities. Within both families that come in several sizes, its gain grows with size, as we predicted before scoring the smallest Qwen3 model. The 0.6B models also show little within-country geography in their output vectors to begin with. An instruction can only bring out geography that the model represents and can be steered towards. Small models need a different remedy, or none.
+
+\paragraph{Smaller places, less geography.}
+Every model above 0.6B reflects less within-country geography for towns of 1,000--4,999 people than for cities of 15,000 or more. The remedy's gain shrinks with it. This is expected: pretraining text mentions small towns less often. It also means that results on large cities overstate what a search system will see for rural queries.
+
 \paragraph{What pre-registration bought.}
 Freezing the claims made three failures visible. H3 (``encoders show none'') failed on two of 42 runs, where weak probes beat a biased centroid in held-out regions. The data support a gap in magnitude: no encoder run above 50~km, no 4B+ decoder run below 116~km. H4 failed because one retrieval model passed on two seeds out of three. R1 failed its all-48 rule on two mean-pooled comparisons with positive point estimates; the supported statement is restricted to last-token pooling. Each failure narrowed a claim we would otherwise have stated too broadly. Freezing also had a cost. The thresholds were strict, and a rule such as ``all three seeds'' can fail on one noisy interval. We kept the failures and stated what the data do support, rather than revising criteria after the fact.
 
 \section{Limitations}
 \label{sec:limitations}
 
-\paragraph{Reuse of the test cities.}
-The same test cities support three claim sets. Each set was fixed before its analysis read them, but the later sets were designed after the earlier results were known, so the test is no longer fresh. We therefore tested the remedy and both baseline findings once more on fresh towns (Section~\ref{sec:res-fresh}). These are a different population, so that test shows generalization to smaller places rather than a clean re-test on large cities.
+\paragraph{Reuse of the test sets.}
+The same test cities support five claim sets, and the 5,000--14,999 test towns support three. Each set was fixed before its analysis read them, but the later sets were designed after the earlier results were known, so these tests are no longer fresh.
+\begin{itemize}
+\item \textbf{Fresh towns.} We tested the remedy and both baseline findings once more on fresh towns (Section~\ref{sec:res-fresh}). These are a different population, so that test shows generalization to smaller places rather than a clean re-test on large cities.
+\item \textbf{New models.} The new models were evaluated on reused sets with the remedy frozen. This is standard benchmark practice, but weaker evidence than a fresh set. The 1,000--4,999 band was fresh for that evaluation.
+\end{itemize}
 
 \paragraph{Selection on validation and stations.}
 The remedy's weights, rank, layer candidates and instruction were chosen while looking at validation cities and at stations. Station results are therefore not held out. The test cities and STS-Benchmark test were not used for any choice, so F1 and F2 are not affected by this selection, but the station results are. The three geographic wordings we tried differ in effect size, and we froze the first, pre-chosen wording.
