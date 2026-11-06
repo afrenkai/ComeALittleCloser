@@ -53,3 +53,8 @@ Small towns (1,000-4,999 people, not in `cities5000` or `cities15000`, unique te
 | 3407923 | size-v1 (`docs/SIZE_FREEZE.md`): parity, then plain, geographic and similarity-instruction features of qwen3-0.6b-embedding for cities, stations, STS validation, towns and small towns | Completed. Parity passed (min cosine 0.99999994, 60 texts) | 0:17:44 |
 | 3407924 | size-v1 check part (`fresh_places --config experiments/size-v1.json --part check`), after 3407923 succeeds | Completed; pipeline ran for all sets. Plain cosine is 0.023-0.051, in line with this model's last-token cosine in `REFLECTED_V1_RESULTS.md` (−0.006 to 0.039), so the features are consistent. No setting changed | 0:08:15 |
 | 3408121 | **Test, once:** `fresh_places --config experiments/size-v1.json --part test` | Submitted | |
+| 3408561 (array 0-2) | search-v2 (`docs/SEARCH_V2_FREEZE.md`): plain and geographic small-town query features, e5-mistral, bge-gemma2, qwen3-8b (`fix-v1.json`) | Submitted | |
+| 3408562 (array 0-3) | Same for qwen3-4b, harrier-0.6b, octen-8b, nemotron-8b (`fix-v2-dev.json`) | Submitted | |
+| 3408563 (array 0-5) | Web-search-instruction small-town queries for the six runnable instruction models | Submitted | |
+| 3408564 | Same three query sets for harrier-27b on 4 gtml L40S | Submitted | |
+| 3408565 | search-v2 check part, after all four succeed | Submitted | |
