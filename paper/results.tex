@@ -424,3 +424,31 @@ The remedy beat standard use in all six runs for harrier-27B ($+0.128$ to $+0.16
 
 \paragraph{One data error drives the failures.}
 For the Qwen3 family and Octen, the random-item intervals reach $-0.45$ to $-0.51$, and the Netherlands drives each of them. Two Dutch pop stations in the catalog have coordinates in the Seychelles. With the geography instruction on documents, these models rank them among the top ten for Dutch pop queries, and the Netherlands' gain falls below $-1.8$ against a pool mean of about 100~km. The search gain has no lower bound, so one such country can outweigh the other 16. We had seen this problem in the validation run and kept P5 as frozen. A post hoc rerun of the same test queries, with the 55 genre stations whose nearest place lies in another country removed from the pools, puts the remedy's mean above standard use in every run for every model, with intervals above 0 in 5 or 6 of 6 runs (last column of Table~\ref{tab:search}). Because this analysis was chosen after the validation run, it is descriptive. P6 repeats it as a frozen test on fresh origins.
+
+\paragraph{Fresh test on clean data (P6).}
+P6 repeated the test with the mislocated stations removed in advance and 1,105 queries from 1,000--4,999 towns that no search run had used (Table~\ref{tab:search2}). The remedy's mean beat standard use in every run for every model, by $+0.006$ to $+0.142$. The all-runs rule passed for harrier-27B ($+0.091$ to $+0.142$) and e5-mistral ($+0.037$ to $+0.078$). It failed for harrier-0.6B and Octen-8B (4 of 6), Qwen3-4B (3 of 6) and bge-multilingual-gemma2 (1 of 6).
+
+Small towns carry less geography, as on places, so the differences are smaller than in P5. With 17 countries, and 12 in the spatial-block runs, a country-level bootstrap leaves wide intervals. The verdicts also changed between the two tests: bge-multilingual-gemma2 passed P5 and failed P6, while e5-mistral did the reverse. For harrier-27B the remedy doubles standard use (0.110 to 0.218), from 22\% to 43\% of the true-distance ceiling. Fusion and the probe add to the geography instruction in all six runs for harrier-27B, e5-mistral, Octen-8B and Qwen3-8B, and in none for harrier-0.6B.
+
+\begin{table}[t]
+\centering
+\footnotesize
+\caption{Station search, search-v2 test (1,105 queries from 1,000--4,999 towns, 17 countries, mislocated stations removed). Mean search gain, random-item / spatial-block. P6: remedy minus standard use, runs with the 95\% interval above 0 (of 6). Qwen3-Embedding-8B and Nemotron are descriptive.}
+\label{tab:search2}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Model & Plain cosine & Standard use & Geo.\ instruction & Remedy & P6 \\
+\midrule
+harrier-oss-v1-27B & 0.094 / 0.096 & 0.110 / 0.109 & 0.164 / 0.167 & \textbf{0.218} / \textbf{0.223} & 6/6 \\
+Nemotron-3-Embed-8B & 0.065 / 0.061 & -- & 0.174 / 0.186 & 0.196 / 0.203 & -- \\
+e5-mistral & 0.086 / 0.088 & 0.102 / 0.111 & 0.125 / 0.133 & \textbf{0.177} / \textbf{0.171} & 6/6 \\
+bge-multilingual-gemma2 & 0.055 / 0.050 & 0.089 / 0.103 & 0.117 / 0.134 & 0.140 / 0.147 & 1/6 \\
+Octen-Embedding-8B & 0.054 / 0.066 & 0.055 / 0.067 & 0.066 / 0.080 & 0.092 / 0.109 & 4/6 \\
+Qwen3-Embedding-8B & 0.044 / 0.038 & 0.056 / 0.056 & 0.052 / 0.078 & 0.085 / 0.103 & (1/6) \\
+Qwen3-Embedding-4B & 0.016 / 0.003 & 0.017 / 0.012 & 0.028 / 0.047 & 0.060 / 0.067 & 3/6 \\
+harrier-oss-v1-0.6B & 0.038 / 0.034 & 0.041 / 0.033 & 0.053 / 0.049 & 0.059 / 0.055 & 4/6 \\
+\midrule
+True distance (ceiling) & \multicolumn{4}{c}{0.503 / 0.513} & \\
+\bottomrule
+\end{tabular}
+\end{table}

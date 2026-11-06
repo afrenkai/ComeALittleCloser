@@ -1,4 +1,4 @@
-# models-v1, size-v1 and search-v1 results (test, run once on 2026-11-05)
+# models-v1, size-v1, search-v1 and search-v2 results (tests, each run once on 2026-11-05/06)
 
 Claims: `docs/MODELS_FREEZE.md`, approved by delegation before any new-model score existed. The addendum on mislocated stations was written after the search check part and before any test run. Job log: `experiments/MODELS_RUNS.md`. Raw scores: `outputs/models-v1/test/scores.jsonl`, `outputs/search-v1/test/scores.jsonl` and `outputs/search-v1-located/test/scores.jsonl`.
 
@@ -124,3 +124,38 @@ The 8B cities and towns numbers come from `FIX_V1_RESULTS.md` and `FRESH_V1_RESU
 - **Qwen3-0.6B has almost no within-country geography to start with.** Its cosine kNN gain is 0.02-0.04, against a geocoder oracle of 0.105-0.112. This matches its last-token cosine in `REFLECTED_V1_RESULTS.md`.
 - **The geography instruction does not help it either.** It responds to the instruction no differently from the similarity instruction (S2).
 - **Two families now show the same pattern.** Within harrier and within Qwen3-Embedding, the fix's gain grows with model size, and at 0.6B it is near zero beyond the original cities. The fix relies on a model that can follow a geographic instruction.
+
+## Verdicts: station search on fresh origins with clean pools (search-v2, job 3409349, 1:17:53)
+
+Claims are in `docs/SEARCH_V2_FREEZE.md`, frozen after search-v1 and before any search-v2 feature existed. The test has 1,105 queries in 17 countries, with origins from the capped small-town (1,000-4,999) test part and up to 25 per genre and country. The 247 mislocated stations are removed from the pools. Spatial-block runs score the queries of held-out blocks, which covers 12 countries.
+
+| Claim | Result (fix minus standard use) | Verdict |
+| --- | --- | --- |
+| P6 harrier-27b | 6 of 6; +0.091 to +0.142, lowest bound +0.053 | **Supported** |
+| P6 e5-mistral | 6 of 6; +0.037 to +0.078, lowest bound +0.010 | **Supported** |
+| P6 harrier-0.6b | 4 of 6; +0.006 to +0.045 | **Not supported** |
+| P6 octen-8b | 4 of 6; +0.033 to +0.051 | **Not supported** |
+| P6 qwen3-4b-embedding | 3 of 6; +0.038 to +0.067 | **Not supported** |
+| P6 bge-multilingual-gemma2 | 1 of 6; +0.026 to +0.068 | **Not supported** |
+
+Qwen3-Embedding-8B (descriptive) is 1 of 6, from +0.027 to +0.068.
+
+**Mean search gain** (random-item / spatial-block):
+
+| Model | Plain cosine | Standard use | Geography instruction | Fix | Ceiling (true distance) |
+| --- | --- | --- | --- | --- | --- |
+| harrier-27b | 0.094 / 0.096 | 0.110 / 0.109 | 0.164 / 0.167 | 0.218 / 0.223 | 0.503 / 0.513 |
+| nemotron-8b (native prefixes) | 0.065 / 0.061 | — | 0.174 / 0.186 | 0.196 / 0.203 | |
+| e5-mistral | 0.086 / 0.088 | 0.102 / 0.111 | 0.125 / 0.133 | 0.177 / 0.171 | |
+| bge-multilingual-gemma2 | 0.055 / 0.050 | 0.089 / 0.103 | 0.117 / 0.134 | 0.140 / 0.147 | |
+| octen-8b | 0.054 / 0.066 | 0.055 / 0.067 | 0.066 / 0.080 | 0.092 / 0.109 | |
+| qwen3-8b-embedding | 0.044 / 0.038 | 0.056 / 0.056 | 0.052 / 0.078 | 0.085 / 0.103 | |
+| qwen3-4b-embedding | 0.016 / 0.003 | 0.017 / 0.012 | 0.028 / 0.047 | 0.060 / 0.067 | |
+| harrier-0.6b | 0.038 / 0.034 | 0.041 / 0.033 | 0.053 / 0.049 | 0.059 / 0.055 | |
+
+- **The fix beats standard use in every run's mean for every model**, by +0.006 to +0.142. With clean pools, the lowest country gain under the fix is −0.03 to −0.28 per model, against below −1.8 for the Netherlands in search-v1.
+- **The strict all-6 rule passes only for e5-mistral and harrier-27b.** Small-town origins carry less geography (as in P4), so the differences are smaller than in search-v1. With 17 countries (12 in spatial-block) the intervals stay wide. bge-gemma2 passed P5 but misses P6; e5-mistral missed P5 by one run but passes P6.
+- **harrier-27b doubles standard use** (0.110 → 0.218), reaching about 43% of the true-distance ceiling, up from 22%.
+- **Fusion and probe add to the geography instruction** in 6 of 6 runs for e5-mistral, harrier-27b, octen-8b and qwen3-8b, 5 for qwen3-4b, 4 for nemotron-8b, 1 for bge-gemma2 and 0 for harrier-0.6b. The geography instruction alone beats standard use in 6 of 6 runs only for harrier-27b.
+
+**Search overall.** The fix helps station search on average for every model and every run once the catalog's geolocation errors are removed. It passes a strict per-run interval test for the largest model (harrier-27b, in both search tests) and for e5-mistral (search-v2). For the others the effect is positive but too small relative to the country-level noise to clear the all-runs rule.

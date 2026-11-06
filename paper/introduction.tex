@@ -1,5 +1,6 @@
 % Introduction. Motivation from paper/proposal_extended.tex; numbers from the frozen
-% test results (LAYERS_V7_CLAIMS.md, REFLECTED_V1_RESULTS.md, FIX_V1_RESULTS.md).
+% test results (LAYERS_V7_CLAIMS.md, REFLECTED_V1_RESULTS.md, FIX_V1_RESULTS.md,
+% FRESH_V1_RESULTS.md, MODELS_V1_RESULTS.md).
 \section{Introduction}
 \label{sec:intro}
 
@@ -16,7 +17,8 @@ Our findings form a diagnosis and a remedy.
 \item \textbf{Decodable.} Every decoder from 4B parameters up, base and retrieval-tuned, holds within-country geography that a linear probe can decode. On test cities it beats the country centroid by 116--375~km on all 48 runs, and the gain holds for the smallest fifth of cities by population. Retrieval training keeps the signal decodable in all four pairs. A country-centroid control also shows that high latitude/longitude $R^2$, the measure of \citet{gurnee2024space}, mostly reflects knowing the country.
 \item \textbf{Partly reflected.} The output vectors of most base models reflect little of this geography in cosine similarity. Retrieval models' output vectors reflect more, at the last-token pooling they use for search, in all four pairs. Even the best one, e5-mistral, reaches only about a third of the true-distance ceiling.
 \item \textbf{A cheap remedy.} Three components need no coordinates at query or index time and are fit on training cities only: a geography task instruction, fusion with an intermediate layer, and a rank-32 distance probe. For e5-mistral and bge-multilingual-gemma2 they raise within-country neighbour quality on test cities from about a third to about half of the ceiling. STS-Benchmark correlation does not drop relative to the uninstructed model. A second frozen test on 32,148 fresh towns confirms the gain. It shows that the geographic wording, not the use of an instruction, drives the gain, and that seed-pair coordinate axes \citep{feuerstein2026recovering} do not improve within-country neighbours.
-\item \textbf{A pre-registered protocol.} We wrote down every claim and pass criterion before the test split was scored, in three sets (H1--H6, R1--R4, F1--F3). Each set was run once. Three claims failed under their own rules, and we report them with the narrower statements the data support.
+\item \textbf{Transfer, size and search.} Applied unchanged to five retrieval models from other teams, the remedy helps every model above 0.6B on test cities and on towns down to 1,000 inhabitants, and its gain grows with model size in two families. In station search it beats standard web-search use on average once mislocated stations are removed, but passes a strict per-run test only for harrier-27B and e5-mistral (Sections~\ref{sec:res-more} and~\ref{sec:res-search}).
+\item \textbf{A pre-registered protocol.} We wrote down every claim and pass criterion before its test data were scored, in seven sets (H1--H6, R1--R4, F1--F3, G1--G3, P1--P5, S1--S3 and P6). Each set was run once. Three of the first claims failed narrowly under their own rules, and later claims failed for the 0.6B models and for most models in search. We report every failure with the narrower statement the data support.
 \end{enumerate}
 
 Section~\ref{sec:related} places this work among probing, geographic language modelling and embedding research. Section~\ref{sec:method} describes data, models, probes, metrics, the remedy and the protocol. Section~\ref{sec:results} reports results, and Section~\ref{sec:discussion} discusses limitations.
