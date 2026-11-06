@@ -329,3 +329,63 @@ All three frozen claims held in all twelve runs (e5-mistral and bge-multilingual
 Qwen3-Embedding-8B, reported descriptively, also clears all three criteria in six of six runs, and the fix beats the geocoder oracle in every model and split.
 
 One component transfers less well. Layer fusion helps in all 18 runs ($+0.006$ to $+0.047$). The distance probe helps bge-multilingual-gemma2 in six of six runs ($+0.008$ to $+0.013$) but e5-mistral in only three and Qwen3-Embedding-8B in none, with differences between $-0.002$ and $+0.005$. On small towns, the instruction and fusion carry the gain.
+
+\subsection{More models, smaller towns and model size}
+\label{sec:res-more}
+
+We applied the frozen remedy, unchanged, to five retrieval models from other teams and scored it on three sets: the original test cities, the fresh-towns test part, and a new band of 1,000--4,999 inhabitants (Section~\ref{sec:method-more}). Table~\ref{tab:more} shows each model's within-country kNN gain before and after the remedy, and the verdicts of the frozen claims.
+
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\caption{The frozen remedy on new models (test sets, run once). Within-country kNN gain, cosine $\rightarrow$ remedy, mean over two splits and three seeds. For Nemotron the remedy is fusion + probe (no native instruction). P1: remedy beats cosine; P2: geographic beats similarity instruction; each needs the 95\% interval above 0 in all 18 runs (three sets, two splits, three seeds). Last column: the geocoder oracle (cosine blended with true coordinates, $w=0.2$) on small towns.}
+\label{tab:more}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Model & Cities & Towns 5k--15k & Towns 1k--5k & P1 & P2 & Oracle 1k--5k \\
+\midrule
+harrier-oss-v1-27B & 0.278 $\rightarrow$ \textbf{0.484} & 0.217 $\rightarrow$ \textbf{0.397} & 0.169 $\rightarrow$ \textbf{0.330} & 18/18 & 18/18 & 0.209 \\
+Nemotron-3-Embed-8B & 0.236 $\rightarrow$ \textbf{0.287} & 0.173 $\rightarrow$ \textbf{0.214} & 0.140 $\rightarrow$ \textbf{0.170} & 18/18 & -- & 0.179 \\
+Octen-Embedding-8B & 0.135 $\rightarrow$ \textbf{0.246} & 0.078 $\rightarrow$ \textbf{0.153} & 0.069 $\rightarrow$ \textbf{0.110} & 18/18 & 18/18 & 0.103 \\
+Qwen3-Embedding-4B & 0.110 $\rightarrow$ \textbf{0.177} & 0.070 $\rightarrow$ \textbf{0.102} & 0.064 $\rightarrow$ \textbf{0.082} & 16/18 & 18/18 & 0.132 \\
+harrier-oss-v1-0.6B & 0.073 $\rightarrow$ 0.101 & 0.068 $\rightarrow$ 0.069 & 0.072 $\rightarrow$ 0.077 & 6/18 & 13/18 & 0.122 \\
+Qwen3-Embedding-0.6B & 0.023 $\rightarrow$ 0.051 & 0.037 $\rightarrow$ 0.037 & 0.042 $\rightarrow$ 0.038 & 5/18 & 2/18 & 0.112 \\
+\midrule
+e5-mistral & & & 0.146 $\rightarrow$ \textbf{0.229} & \multicolumn{2}{c}{P3: 6/6} & 0.197 \\
+bge-multilingual-gemma2 & & & 0.146 $\rightarrow$ \textbf{0.227} & \multicolumn{2}{c}{P3: 6/6} & 0.183 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Verdicts.}
+\begin{itemize}
+\item \textbf{Supported.} The remedy beat cosine in all 18 runs for harrier-27B ($+0.148$ to $+0.224$), Octen-8B ($+0.033$ to $+0.124$) and Nemotron-8B ($+0.027$ to $+0.062$, fusion and probe only). The geographic wording drove the gain for harrier-27B, Octen-8B and Qwen3-4B (P2, 18 of 18 each). On the new 1,000--4,999 band, the remedy helped both original models in all six runs (P3, $+0.063$ to $+0.095$).
+\item \textbf{Narrowly failed.} Qwen3-4B's P1 failed on 16 of 18. Its difference was positive in every run, but two small-town intervals reached $-0.003$ and $-0.007$.
+\item \textbf{Failed.} Both 0.6B models failed P1 and P2: harrier-0.6B on 6 and 13 of 18, and Qwen3-0.6B on 5 and 2 of 18 (S1, S2). For both, the remedy helps on the original cities and does nothing on towns.
+\end{itemize}
+
+\paragraph{Population trend.}
+Within-country geography falls with population in every model that has any. For example, harrier-27B's cosine gain falls from 0.278 on cities to 0.169 on the smallest towns, and Octen-8B's from 0.135 to 0.069. The remedy's gain shrinks with it but stays positive for every model above 0.6B. harrier-27B keeps most of its gain (from $+0.206$ on cities to $+0.161$ on the smallest towns) and beats the geocoder oracle on every set and split. Nemotron also improves when given our instruction, in a format it was not trained on: instruction + fusion + probe reaches 0.344--0.348 on cities (descriptive).
+
+\paragraph{Model size.}
+Two model families show the same pattern. The remedy needs a model large enough to follow a geographic instruction (Table~\ref{tab:size}). Within Qwen3-Embedding, its mean gain over cosine grows from 0.6B to 4B to 8B on all three sets, as frozen in advance (S3). Within harrier, the 27B model gains $+0.161$ to $+0.206$ on each set, and the 0.6B model at most $+0.028$. At 0.6B, both families have little within-country geography in their output vectors (cosine 0.02--0.07), and the geography instruction does no better than the similarity instruction.
+
+\begin{table}[t]
+\centering
+\footnotesize
+\caption{Remedy gain over cosine (within-country kNN gain, mean over runs) by model size. Qwen3-Embedding-8B values come from the fix-v1 cities and fresh-v1 towns tests.}
+\label{tab:size}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Set & Qwen3 0.6B & Qwen3 4B & Qwen3 8B & harrier 0.6B & harrier 27B \\
+\midrule
+Cities & $+0.028$ & $+0.067$ & $+0.104$ & $+0.028$ & $+0.206$ \\
+Towns 5k--15k & $-0.000$ & $+0.032$ & $+0.070$ & $+0.001$ & $+0.180$ \\
+Towns 1k--5k & $-0.004$ & $+0.018$ & $+0.050$ & $+0.005$ & $+0.161$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Fusion and the probe.}
+Layer fusion helps every run for harrier-27B, e5-mistral and bge-multilingual-gemma2. It helps Octen-8B in 15 of 18 runs, Qwen3-4B in 10 and Nemotron in 9, and harrier-0.6B in none. The probe again adds little: between $-0.004$ and $+0.014$, with an interval above 0 in at most 10 of 18 runs per model.

@@ -158,7 +158,7 @@ Three comparisons address open questions about the remedy. They run on validatio
 Results are reported, labelled as validation, in Section~\ref{sec:res-closing}.
 
 \subsection{More models, smaller towns and station search}
-\label{sec:method-models}
+\label{sec:method-more}
 
 A final frozen evaluation asks whether the remedy holds beyond the three models it was built with, on even smaller places, and in a realistic search. The remedy itself is unchanged. Every setting comes from the fix-v1 plan, and every component is fit on the original training cities.
 
@@ -197,3 +197,18 @@ The new band comes from GeoNames \texttt{cities1000}. It keeps places absent fro
 \item \textbf{P5, per instruction model:} the remedy beats standard use in station search (6 runs).
 \end{itemize}
 The population trend across the three sets (P4) is descriptive.
+
+\paragraph{Two follow-up tests.} Two later tests were each frozen before any of their data existed, but after the results above were known.
+\begin{itemize}
+\item \textbf{Model size.} The harrier results suggested that the remedy needs a large enough model. We added Qwen3-Embedding-0.6B, which completes the Qwen3-Embedding 0.6B/4B/8B series, on the same three sets.
+  \begin{itemize}
+  \item S1 and S2 repeat P1 and P2 for it.
+  \item S3 predicts, without an interval, that the remedy's mean gain over cosine grows from 0.6B to 4B to 8B on every set.
+  \end{itemize}
+\item \textbf{Station search on clean data.} The station-search validation run exposed geolocation errors in the catalog. For example, two Dutch stations have coordinates in the Seychelles. 55 of the 3,004 stations with a search genre lie nearest to a place in another country than their catalog country.
+  \begin{itemize}
+  \item \textbf{Frozen test.} We kept P5 as frozen.
+  \item \textbf{Post hoc analysis.} We added a descriptive rerun of its test queries with these stations removed from the pools.
+  \item \textbf{Fresh test (P6).} P6 repeats P5 on fresh data. These stations are removed in advance, origins come from the 1,000--4,999 test band, which no search run had used, and up to 25 origins per genre and country give 1,105 test queries.
+  \end{itemize}
+\end{itemize}
