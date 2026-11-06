@@ -1,4 +1,4 @@
-# models-v1 and search-v1 results (test, run once on 2026-11-05)
+# models-v1, size-v1 and search-v1 results (test, run once on 2026-11-05)
 
 Claims: `docs/MODELS_FREEZE.md`, approved by delegation before any new-model score existed. The addendum on mislocated stations was written after the search check part and before any test run. Job log: `experiments/MODELS_RUNS.md`. Raw scores: `outputs/models-v1/test/scores.jsonl`, `outputs/search-v1/test/scores.jsonl` and `outputs/search-v1-located/test/scores.jsonl`.
 
@@ -100,3 +100,27 @@ Qwen3-Embedding-8B (descriptive) is 2 of 6, from −0.080 to +0.130.
 | harrier-0.6b | 5 of 6 | +0.029 to +0.037 | −0.001 |
 
 With located pools the fix beats standard use in every run's mean. Fusion and probe add to the geography instruction in 6 of 6 runs for e5-mistral, qwen3-8b, octen-8b and harrier-27b. This was chosen after the check part, so it is repeated as a frozen test on fresh origins in search-v2 (`docs/SEARCH_V2_FREEZE.md`).
+
+## Verdicts: model size within Qwen3-Embedding (size-v1, job 3408121, 0:12:09)
+
+Claims are in `docs/SIZE_FREEZE.md`, frozen before any Qwen3-Embedding-0.6B score under the fix. It uses the same three test sets and settings as models-v1.
+
+| Claim | Result | Verdict |
+| --- | --- | --- |
+| S1: the fix beats cosine for qwen3-0.6b-embedding (18 runs) | 5 of 18; −0.021 to +0.037 | **Not supported** |
+| S2: geographic beats similarity instruction (18 runs) | 2 of 18; −0.027 to +0.029 | **Not supported** |
+| S3: fix gain 0.6B < 4B < 8B on every set (descriptive, predicted) | Holds on all three sets (table below) | **Held** |
+
+Each cell gives the mean within-country kNN gain as cosine → fix, with the fix's gain in brackets:
+
+| Set | 0.6B | 4B | 8B |
+| --- | --- | --- | --- |
+| Cities | 0.023 → 0.051 (+0.028) | 0.110 → 0.177 (+0.067) | 0.138 → 0.241 (+0.104) |
+| Towns | 0.037 → 0.037 (−0.000) | 0.070 → 0.102 (+0.032) | 0.083 → 0.153 (+0.070) |
+| Small towns | 0.042 → 0.038 (−0.004) | 0.064 → 0.082 (+0.018) | 0.069 → 0.119 (+0.050) |
+
+The 8B cities and towns numbers come from `FIX_V1_RESULTS.md` and `FRESH_V1_RESULTS.md`; all other cells are from models-v1 and size-v1.
+
+- **Qwen3-0.6B has almost no within-country geography to start with.** Its cosine kNN gain is 0.02-0.04, against a geocoder oracle of 0.105-0.112. This matches its last-token cosine in `REFLECTED_V1_RESULTS.md`.
+- **The geography instruction does not help it either.** It responds to the instruction no differently from the similarity instruction (S2).
+- **Two families now show the same pattern.** Within harrier and within Qwen3-Embedding, the fix's gain grows with model size, and at 0.6B it is near zero beyond the original cities. The fix relies on a model that can follow a geographic instruction.
