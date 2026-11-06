@@ -389,3 +389,38 @@ Towns 1k--5k & $-0.004$ & $+0.018$ & $+0.050$ & $+0.005$ & $+0.161$ \\
 
 \paragraph{Fusion and the probe.}
 Layer fusion helps every run for harrier-27B, e5-mistral and bge-multilingual-gemma2. It helps Octen-8B in 15 of 18 runs, Qwen3-4B in 10 and Nemotron in 9, and harrier-0.6B in none. The probe again adds little: between $-0.004$ and $+0.014$, with an interval above 0 in at most 10 of 18 runs per model.
+
+\subsection{Station search}
+\label{sec:res-search}
+
+The station-search test asks whether the remedy helps a realistic query: stations of a genre near a town, ranked within the town's country (Section~\ref{sec:method-more}). Table~\ref{tab:search} gives the mean search gain for each method.
+
+\begin{table}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Station search, search-v1 test (450 queries, 17 countries, origins from the fresh-towns test part). Mean search gain, random-item / spatial-block, over three seeds. Standard use: each model's web-search instruction on the query, plain documents. Remedy: geography instruction on both sides, fusion and probe; for Nemotron, its native prefixes with fusion and probe. P5: remedy minus standard use, runs with the 95\% interval above 0 (of 6), with the frozen pools and, post hoc, with the 55 mislocated stations removed. Qwen3-Embedding-8B was not a claim model; its counts are descriptive.}
+\label{tab:search}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Model & Plain cosine & Standard use & Geo.\ instruction & Remedy & P5 & P5, located \\
+\midrule
+harrier-oss-v1-27B & 0.128 / 0.148 & 0.197 / 0.192 & 0.283 / 0.280 & \textbf{0.331} / \textbf{0.335} & 6/6 & 6/6 \\
+e5-mistral & 0.173 / 0.155 & 0.148 / 0.128 & 0.228 / 0.227 & \textbf{0.268} / \textbf{0.281} & 5/6 & 6/6 \\
+bge-multilingual-gemma2 & 0.133 / 0.104 & 0.183 / 0.190 & 0.249 / 0.255 & \textbf{0.262} / \textbf{0.270} & 6/6 & 5/6 \\
+Nemotron-3-Embed-8B & 0.163 / 0.154 & -- & 0.257 / 0.259 & 0.271 / 0.247 & -- & -- \\
+Qwen3-Embedding-8B & $-0.026$ / 0.052 & 0.124 / 0.118 & 0.021 / 0.152 & 0.047 / 0.174 & 2/6 & 6/6 \\
+Octen-Embedding-8B & 0.096 / 0.134 & 0.128 / 0.119 & 0.080 / 0.179 & 0.047 / 0.172 & 2/6 & 6/6 \\
+harrier-oss-v1-0.6B & 0.112 / 0.100 & 0.126 / 0.119 & 0.078 / 0.115 & 0.110 / 0.141 & 2/6 & 5/6 \\
+Qwen3-Embedding-4B & $-0.069$ / 0.014 & 0.109 / 0.087 & $-0.022$ / 0.100 & $-0.001$ / 0.101 & 1/6 & 5/6 \\
+\midrule
+True distance (ceiling) & \multicolumn{4}{c}{0.561 / 0.572} & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Frozen test (P5).}
+The remedy beat standard use in all six runs for harrier-27B ($+0.128$ to $+0.160$) and bge-multilingual-gemma2 ($+0.061$ to $+0.113$). e5-mistral missed one run (random-item seed 3141, $+0.108$ [$-0.013$, $+0.230$]). Octen-8B and harrier-0.6B passed 2 of 6 runs, and Qwen3-4B 1 of 6. For the strongest model, the remedy closes more than a third of the gap between standard use and the true-distance ceiling.
+
+\paragraph{One data error drives the failures.}
+For the Qwen3 family and Octen, the random-item intervals reach $-0.45$ to $-0.51$, and the Netherlands drives each of them. Two Dutch pop stations in the catalog have coordinates in the Seychelles. With the geography instruction on documents, these models rank them among the top ten for Dutch pop queries, and the Netherlands' gain falls below $-1.8$ against a pool mean of about 100~km. The search gain has no lower bound, so one such country can outweigh the other 16. We had seen this problem in the validation run and kept P5 as frozen. A post hoc rerun of the same test queries, with the 55 genre stations whose nearest place lies in another country removed from the pools, puts the remedy's mean above standard use in every run for every model, with intervals above 0 in 5 or 6 of 6 runs (last column of Table~\ref{tab:search}). Because this analysis was chosen after the validation run, it is descriptive. P6 repeats it as a frozen test on fresh origins.
