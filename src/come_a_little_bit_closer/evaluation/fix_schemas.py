@@ -6,6 +6,7 @@ import numpy as np
 from jaxtyping import Float32
 from pydantic import BaseModel, Field, model_validator
 
+from come_a_little_bit_closer.data.schemas import SmallTownSource, TownSource
 from come_a_little_bit_closer.evaluation.layer_schemas import (
     CountryReflection,
     EvaluationMode,
@@ -21,8 +22,15 @@ type FixCollection = Literal[
     "sts-dev",
     "sts-test",
     "towns-name-country",
+    "small-towns-name-country",
+    "search-documents",
+    "search-queries-check",
+    "search-queries-test",
+    "small-search-queries-check",
+    "small-search-queries-test",
 ]
 type FreshPart = Literal["check", "test"]
+type ScoredSet = Literal["cities", "towns", "small-towns"]
 type TownExtraction = Literal["plain-and-instructed", "instructed"]
 type FixMethod = Literal[
     "cosine",
@@ -43,15 +51,21 @@ type FixMethod = Literal[
 
 
 class InstructedModel(BaseModel):
-    """A retrieval model and its native instruction format ({instruction}, {text})."""
+    """A retrieval model, its instruction format ({instruction}, {text}), its plain
+    (uninstructed) text format and the pooling it searches with."""
 
     model_id: str
     template: str
+    plain_template: str = "{text}"
+    pooling: Literal["last", "mean"] = "last"
 
     @model_validator(mode="after")
     def template_has_fields(self) -> "InstructedModel":
         if "{instruction}" not in self.template or "{text}" not in self.template:
             raise ValueError("Templates need {instruction} and {text}.")
+        plain = self.plain_template
+        if "{text}" not in plain or "{instruction}" in plain:
+            raise ValueError("Plain templates need {text} and no {instruction}.")
         return self
 
 
@@ -66,6 +80,7 @@ class FixPlan(BaseModel):
     output_directory: Path
     sts_files: dict[Literal["dev", "test"], Path]
     sts_sha256: dict[Literal["dev", "test"], str]
+    plain_from_layers: bool = True
     split_kinds: list[SplitKind] = ["random-item", "spatial-block"]
     fusion_weight: float = Field(default=1.0, ge=0)
     distance_weight: float = Field(default=0.1, ge=0)
@@ -87,6 +102,7 @@ class FixPlan(BaseModel):
 
 class InstructedManifest(BaseModel):
     model_id: str
+    pooling: Literal["last", "mean"] = "last"
     checkpoint: str
     revision: str
     collection: FixCollection
@@ -132,10 +148,35 @@ class BaselinePlan(BaseModel):
     feuerstein_weights: list[float] = [0.2, 1.0]
 
 
-class FreshPlan(BaseModel):
-    """Fresh held-out towns, scored with components fit on the original training cities.
+class PlanPair(BaseModel):
+    """A geographic-instruction plan, its similarity-instruction twin, and the sets
+    their models are scored on."""
 
-    Towns are split once into a check part (pipeline checks) and a test part (run once).
+    fix_plan: Path
+    generic_plan: Path
+    sets: list[ScoredSet]
+
+
+class FreshClaim(BaseModel):
+    """first minus second in city kNN gain, paired by country, CI above 0 in every
+    run of the named models and sets."""
+
+    label: str
+    title: str
+    first: FixMethod
+    second: FixMethod
+    second_weight: float | None = None
+    models: list[str]
+    sets: list[ScoredSet]
+
+
+class FreshPlan(BaseModel):
+    """Held-out places scored with components fit on the original training cities.
+
+    Towns are split once into a check part (pipeline checks) and a test part (run
+    once). For the original cities, the check part is the validation split and the
+    test part the test split. Without explicit claims, G1-G3 of fresh-v1 apply to
+    `claim_models` on `sets`.
     """
 
     experiment_id: str
@@ -148,11 +189,17 @@ class FreshPlan(BaseModel):
     claim_models: list[str]
     feuerstein_weights: list[float] = [0.2, 1.0]
     feuerstein_claim_weight: float = 0.2
+    sets: list[ScoredSet] = ["towns"]
+    extra_pairs: list[PlanPair] = []
+    small_towns_sha256: str | None = None
+    test_caps: dict[ScoredSet, int] = {}
+    claims: list[FreshClaim] = []
 
 
 class TownScore(BaseModel):
     model_id: str
     part: FreshPart
+    scored_set: ScoredSet = "towns"
     split_kind: SplitKind
     seed: int
     method: FixMethod
@@ -204,3 +251,73 @@ class FeuersteinMap:
     projection_high: np.ndarray
     coordinate_low: np.ndarray
     coordinate_high: np.ndarray
+
+
+class SearchSource(BaseModel):
+    """Station search: stations of a genre near a town, within the town's country."""
+
+    genre_plan: Path = Path("experiments/location-v2.json")
+    genres: int = Field(default=8, gt=0)
+    minimum_stations: int = Field(default=20, gt=10)
+    origins_per_pair: int = Field(default=10, gt=0)
+    sample_seed: int = 20261104
+    partition_seed: int = 20261104
+    check_fraction: float = Field(default=0.2, gt=0, lt=1)
+    towns: TownSource = TownSource()
+    test_cap: int | None = None
+    exclude_mislocated: bool = False
+
+
+class SmallSearchSource(SearchSource):
+    """search-v2: small-town origins (the models-v1 test part, capped as there),
+    25 origins per genre and country, and no mislocated stations."""
+
+    origins_per_pair: int = Field(default=25, gt=0)
+    towns: TownSource = SmallTownSource()
+    test_cap: int | None = 25000
+    exclude_mislocated: bool = True
+
+
+class SearchQuery(BaseModel):
+    query_id: str
+    genre: str
+    town_id: str
+    country_code: str
+    text: str
+    latitude: float
+    longitude: float
+
+
+class SearchPair(BaseModel):
+    """A geographic-instruction plan and its web-search-instruction twin."""
+
+    fix_plan: Path
+    search_plan: Path
+
+
+class SearchPlan(BaseModel):
+    experiment_id: str
+    pairs: list[SearchPair]
+    output_directory: Path
+    towns_sha256: str
+    claim_models: list[str]
+    exclude_mislocated: bool = False
+    origins: Literal["towns", "small-towns"] = "towns"
+    claim_label: str = "P5"
+
+
+class CountrySearch(BaseModel):
+    country_code: str
+    queries: int
+    gain: float
+
+
+class SearchScore(BaseModel):
+    model_id: str
+    part: FreshPart
+    split_kind: SplitKind
+    seed: int
+    method: str
+    queries: int
+    search_gain: float
+    countries: list[CountrySearch]

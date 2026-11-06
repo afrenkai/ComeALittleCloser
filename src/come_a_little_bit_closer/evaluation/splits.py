@@ -126,3 +126,14 @@ def split_indices(manifest: SplitManifest, split: SplitName) -> IndexVector:
         ],
         dtype=np.int64,
     )
+
+
+def holdout_parts(
+    count: int, seed: int, check_fraction: float, cap: int | None = None
+) -> tuple[IndexVector, IndexVector]:
+    """Check and test rows of a fixed permutation; a cap keeps the test part's first
+    rows in permutation order."""
+    order = np.random.default_rng(seed).permutation(count)
+    check_count = int(round(count * check_fraction))
+    test = order[check_count:] if cap is None else order[check_count:][:cap]
+    return np.sort(order[:check_count]), np.sort(test)

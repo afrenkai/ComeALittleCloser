@@ -1,0 +1,26 @@
+{
+  "experiment_id": "search-v2",
+  "pairs": [
+    {
+      "fix_plan": "experiments/fix-v1.json",
+      "search_plan": "experiments/search-instruction-v1.json"
+    },
+    {
+      "fix_plan": "experiments/fix-v2.json",
+      "search_plan": "experiments/search-instruction-v1.json"
+    }
+  ],
+  "output_directory": "outputs/search-v2",
+  "towns_sha256": "11fa57195c80a0ead0fbcf69b114b2c398571dfaa4b04622acff40c930f327f5",
+  "claim_models": [
+    "e5-mistral",
+    "bge-multilingual-gemma2",
+    "qwen3-4b-embedding",
+    "harrier-0.6b",
+    "harrier-27b",
+    "octen-8b"
+  ],
+  "exclude_mislocated": true,
+  "origins": "small-towns",
+  "claim_label": "P6"
+}

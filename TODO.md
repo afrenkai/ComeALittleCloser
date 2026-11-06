@@ -25,6 +25,9 @@
 - [x] Coordinate-free fix (instruction + layer fusion + distance probe); frozen and tested once under fix-v1 (`experiments/FIX_V1_RESULTS.md`).
 - [x] Fix baselines on validation: similarity instruction, factorial ablation, Feuerstein et al. 2026 axes (`experiments/FIX_RUNS.md`, fix-baselines-v1).
 - [x] Fresh held-out places: GeoNames towns of 5,000-14,999 people; G1-G3 tested once under fresh-v1 (`experiments/FRESH_V1_RESULTS.md`).
+- [x] Five more retrieval models, a 1,000-4,999 town band and model size (models-v1, size-v1), tested once (`experiments/MODELS_V1_RESULTS.md`).
+- [x] Station search task (search-v1, search-v2), tested once; see the same file.
+- [ ] Fix or flag the 247 catalog stations whose coordinates lie nearest a place in another country (`located_mask` in `evaluation/search_items.py`).
 - [ ] Evaluate H3 candidate recall before using it as a retrieval baseline.
 - [ ] Consider geographic adaptation after the audited controls.
 

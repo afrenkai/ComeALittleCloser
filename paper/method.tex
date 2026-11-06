@@ -156,3 +156,59 @@ Three comparisons address open questions about the remedy. They run on validatio
 \item \textbf{Seed-pair axes} \citep{feuerstein2026recovering}. Their axis $d=\sum(p_1-p_2)$ over seed pairs, computed on plain unit-norm output vectors without centring, one axis for latitude and one for longitude. Instead of two seed pairs we pair every training city (upper half against lower half by coordinate), in a global variant and a within-country variant. Axis scores are mapped by min--max scaling to the training coordinate range, turned into positions, and used alone or blended with cosine at $w=0.2$ and $w=1.0$, in the same form as the oracle.
 \end{itemize}
 Results are reported, labelled as validation, in Section~\ref{sec:res-closing}.
+
+\subsection{More models, smaller towns and station search}
+\label{sec:method-more}
+
+A final frozen evaluation asks whether the remedy holds beyond the three models it was built with, on even smaller places, and in a realistic search. The remedy itself is unchanged. Every setting comes from the fix-v1 plan, and every component is fit on the original training cities.
+
+\paragraph{Models.} We add five public retrieval models from other teams:
+\begin{itemize}
+\item Qwen3-Embedding-4B;
+\item harrier-oss-v1 at 0.6B (Qwen3-based) and 27B (Gemma-3-based);
+\item Octen-Embedding-8B, a fine-tune of Qwen3-Embedding-8B;
+\item Nemotron-3-Embed-8B, a bidirectional model that searches with mean pooling.
+\end{itemize}
+Before any scoring, our pooled output layer had to reproduce each model's own embedding: cosine $\geq 0.9999$ against its Sentence Transformers pipeline or its model card's example. Nemotron accepts only fixed \texttt{query:}/\texttt{passage:} prefixes, with no task instruction, so its frozen claim covers fusion and the probe only.
+
+\paragraph{Places.} We score three sets:
+\begin{itemize}
+\item the original test cities (reused);
+\item the fresh-towns test part (reused);
+\item a new band of towns with 1,000--4,999 inhabitants.
+\end{itemize}
+The new band comes from GeoNames \texttt{cities1000}. It keeps places absent from both larger extracts, with a unique text that differs from every text in them, which leaves 68,202 towns. The same permutation seed gives a 20\% check part and an 80\% test part; the test part is capped at 25,000 towns. Reusing a test set to evaluate a frozen method on new models is standard benchmark practice, but it is weaker evidence than a fresh set, and we label it as such.
+
+\paragraph{Station search.} A query asks for stations of a genre near a town: ``\textit{rock radio stations near Bovril, Argentina}''.
+\begin{itemize}
+\item \textbf{Documents.} Each station document gives its name, the nearest \texttt{cities15000} place with its country, and its genres. Coordinates are never shown to a model.
+\item \textbf{Queries.} Genres are the eight most frequent of the frozen 45-genre list. For each genre, we use countries with at least 20 stations carrying it. Up to ten fresh-towns origins are drawn per genre and country: 445 validation queries and 450 test queries.
+\item \textbf{Pool.} Genre is matched lexically, as in our explorer, so each query's pool is the stations of its genre in its country.
+\item \textbf{Ranking.} The embedding model ranks the pool.
+\item \textbf{Metric.} \emph{Search gain} is $1-\bar d_{10}/\bar d_{\mathrm{pool}}$: the mean distance of the ten top-ranked stations over that of the whole pool, averaged per country.
+\end{itemize}
+\emph{Standard use} wraps the query in each model's web-search instruction and leaves documents plain. The remedy wraps both sides in the geography instruction and adds fusion and the probe.
+
+\paragraph{Claims.} We froze these claims before any score of the new models existed. Each needs a 95\% interval above 0 in every run.
+\begin{itemize}
+\item \textbf{P1, per model:} the remedy beats cosine on all three sets (18 runs). For Nemotron, fusion and probe beat cosine.
+\item \textbf{P2, per instruction model:} the geographic instruction beats the similarity instruction (18 runs).
+\item \textbf{P3:} for e5-mistral and bge-multilingual-gemma2, the remedy beats cosine on the 1,000--4,999 band.
+\item \textbf{P5, per instruction model:} the remedy beats standard use in station search (6 runs).
+\end{itemize}
+The population trend across the three sets (P4) is descriptive.
+
+\paragraph{Two follow-up tests.} Two later tests were each frozen before any of their data existed, but after the results above were known.
+\begin{itemize}
+\item \textbf{Model size.} The harrier results suggested that the remedy needs a large enough model. We added Qwen3-Embedding-0.6B, which completes the Qwen3-Embedding 0.6B/4B/8B series, on the same three sets.
+  \begin{itemize}
+  \item S1 and S2 repeat P1 and P2 for it.
+  \item S3 predicts, without an interval, that the remedy's mean gain over cosine grows from 0.6B to 4B to 8B on every set.
+  \end{itemize}
+\item \textbf{Station search on clean data.} The station-search validation run exposed geolocation errors in the catalog. For example, two Dutch stations have coordinates in the Seychelles. 55 of the 3,004 stations with a search genre lie nearest to a place in another country than their catalog country.
+  \begin{itemize}
+  \item \textbf{Frozen test.} We kept P5 as frozen.
+  \item \textbf{Post hoc analysis.} We added a descriptive rerun of its test queries with these stations removed from the pools.
+  \item \textbf{Fresh test (P6).} P6 repeats P5 on fresh data. These stations are removed in advance, origins come from the 1,000--4,999 test band, which no search run had used, and up to 25 origins per genre and country give 1,105 test queries.
+  \end{itemize}
+\end{itemize}

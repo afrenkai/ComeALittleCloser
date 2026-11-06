@@ -260,24 +260,40 @@ def sts_spearman(score: np.ndarray, pairs: StsPairs) -> float:
     return spearman(score[pairs.first, pairs.second], pairs.scores)
 
 
-def model_features(
-    plan: FixPlan, layers: LayerPlan, model_id: str, sts_collection: FixCollection
-) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], list[int]]:
-    """Plain and instructed last-token features on the instructed manifest's layers."""
-    plain_sts, sts_manifest = read_instructed(plan, model_id, sts_collection, False)
-    kept = sts_manifest.kept_layers
-    plain = {
-        "cities": np.asarray(
+def plain_cities(
+    plan: FixPlan, layers: LayerPlan, model_id: str, kept: list[int]
+) -> np.ndarray:
+    """Uninstructed city features, from the layer extraction or the fix plan's own."""
+    if plan.plain_from_layers:
+        return np.asarray(
             np.load(
                 feature_path(layers, model_id, "cities", "name-country", "last"),
                 mmap_mode="r",
             )[kept]
-        ),
-        "stations": np.asarray(
-            np.load(
-                feature_path(layers, model_id, "stations", "metadata", "last"),
-                mmap_mode="r",
-            )[kept]
+        )
+    cities, manifest = read_instructed(plan, model_id, "cities-name-country", False)
+    if manifest.kept_layers != kept:
+        raise ValueError("Plain city features keep different layers.")
+    return cities
+
+
+def model_features(
+    plan: FixPlan, layers: LayerPlan, model_id: str, sts_collection: FixCollection
+) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray], list[int]]:
+    """Plain and instructed features on the instructed manifest's layers."""
+    plain_sts, sts_manifest = read_instructed(plan, model_id, sts_collection, False)
+    kept = sts_manifest.kept_layers
+    plain = {
+        "cities": plain_cities(plan, layers, model_id, kept),
+        "stations": (
+            np.asarray(
+                np.load(
+                    feature_path(layers, model_id, "stations", "metadata", "last"),
+                    mmap_mode="r",
+                )[kept]
+            )
+            if plan.plain_from_layers
+            else read_instructed(plan, model_id, "stations-metadata", False)[0]
         ),
         "sts": plain_sts,
     }

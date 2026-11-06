@@ -1,0 +1,56 @@
+{
+  "experiment_id": "size-v1",
+  "fix_plan": "experiments/fix-v3.json",
+  "generic_plan": "experiments/fix-generic-v3.json",
+  "output_directory": "outputs/size-v1",
+  "towns_sha256": "56cf653fa79d1f5682c55231a46dd43b680abeac2d8aaaae3335b6248f4d8442",
+  "small_towns_sha256": "11fa57195c80a0ead0fbcf69b114b2c398571dfaa4b04622acff40c930f327f5",
+  "check_fraction": 0.2,
+  "partition_seed": 20261104,
+  "claim_models": [
+    "qwen3-0.6b-embedding"
+  ],
+  "feuerstein_weights": [
+    0.2,
+    1.0
+  ],
+  "feuerstein_claim_weight": 0.2,
+  "sets": [
+    "cities",
+    "towns",
+    "small-towns"
+  ],
+  "test_caps": {
+    "small-towns": 25000
+  },
+  "claims": [
+    {
+      "label": "S1 qwen3-0.6b-embedding",
+      "title": "Fix vs cosine",
+      "first": "instruction-fusion-probe",
+      "second": "cosine",
+      "models": [
+        "qwen3-0.6b-embedding"
+      ],
+      "sets": [
+        "cities",
+        "towns",
+        "small-towns"
+      ]
+    },
+    {
+      "label": "S2 qwen3-0.6b-embedding",
+      "title": "Geographic vs similarity instruction, both with fusion and probe",
+      "first": "instruction-fusion-probe",
+      "second": "generic-instruction-fusion-probe",
+      "models": [
+        "qwen3-0.6b-embedding"
+      ],
+      "sets": [
+        "cities",
+        "towns",
+        "small-towns"
+      ]
+    }
+  ]
+}

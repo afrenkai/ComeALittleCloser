@@ -90,7 +90,7 @@ def test_fresh_towns_drop_reference_places_bands_and_shared_texts(
     towns = load_fresh_towns(
         TownSource(
             archive=tmp_path / "cities5000.zip",
-            reference_archive=tmp_path / "cities15000.zip",
+            reference_archives=[tmp_path / "cities15000.zip"],
             country_info=country_info_path,
         )
     )

@@ -1,4 +1,4 @@
-# Progress report — 2026-11-04
+# Progress report — 2026-11-06
 
 A plain-language summary of where the project stands, for the team. Technical run logs live in [`experiments/LAYERS_RUNS.md`](../experiments/LAYERS_RUNS.md); this page explains what they mean.
 
@@ -171,6 +171,21 @@ Decisions made along the way:
 
 The one-page update is [`paper/update/TeamN.tex`](../paper/update/TeamN.tex) (PDF next to it). We revised it against the course feedback and then against three rounds of mock grading (LLM reviewers: 9.0, 9.2, 9.0 out of 10). What changed: three linked views specified with interactions and signal-vs-noise rules (V1 globe ranking, V2 layer-by-region map, V3 distortion map), a sharper critique of Decoupes et al. and Gurnee & Tegmark, the three retrieval metrics and what each answers, a "decodable vs. reflected in retrieval" distinction, pre-stated case studies C1–C4, and a rebalanced plan. The remaining criticism is not about wording: **V2 and V3 are not built yet, and the new retrieval metrics have no numbers yet.** That is the main risk to the course grade.
 
+## More models, smaller towns, model size and station search (2026-11-05/06)
+
+Branch `research/more-models`; log [`experiments/MODELS_RUNS.md`](../experiments/MODELS_RUNS.md), results [`experiments/MODELS_V1_RESULTS.md`](../experiments/MODELS_V1_RESULTS.md). Claims were frozen in [`docs/MODELS_FREEZE.md`](MODELS_FREEZE.md), [`docs/SIZE_FREEZE.md`](SIZE_FREEZE.md) and [`docs/SEARCH_V2_FREEZE.md`](SEARCH_V2_FREEZE.md), and each test ran once.
+
+- **Five new retrieval models** with the frozen fix: Qwen3-Embedding-4B, harrier-oss-v1 0.6B and 27B, Octen-Embedding-8B and Nemotron-3-Embed-8B. They were scored on the test cities, the fresh-v1 towns and a new band of 1,000-4,999 towns.
+  - P1 is supported (18 of 18) for harrier-27b, octen-8b and nemotron-8b. qwen3-4b reaches 16 of 18, with every run positive, and harrier-0.6b 6 of 18.
+  - harrier-27b goes from 0.278 to 0.484 on cities and beats the coordinate oracle everywhere.
+- **Population trend.** Geography and the fix's gain both shrink from cities to small towns, but the gain stays positive for every model above 0.6B. P3 is supported for e5-mistral and bge-gemma2 on small towns.
+- **Model size** (size-v1). Qwen3-Embedding-0.6B fails S1 and S2, and the predicted size ordering 0.6B < 4B < 8B holds on all three sets (S3). Within both harrier and Qwen3-Embedding, the fix needs a large model.
+- **Station search** ("rock radio stations near X"; fix vs each model's web-search instruction).
+  - search-v1 (P5): supported for harrier-27b and bge-gemma2. The failures trace to catalog geolocation errors: two Dutch stations sit in the Seychelles.
+  - search-v2 (P6): fresh small-town origins with the 247 mislocated stations removed. The fix beats standard use in every run's mean for every model, but passes the all-runs interval rule only for harrier-27b and e5-mistral.
+- **Paper.** The results are in `paper/` (Sections "More models, smaller towns and model size" and "Station search"), along with the abstract, introduction, discussion and conclusion.
+- **Test use.** Every test part defined so far has been used (see `AGENTS.md`). New claims need another held-out set.
+
 ## Next steps (owners as proposed in the update; please confirm)
 
 | When | What | Owner |
@@ -206,12 +221,14 @@ Honest assessment as of 2026-11-04: a solid workshop paper (e.g. BlackboxNLP) no
   - Encoders are not exactly zero on spatial-block, so the claim is a gap in size, not "none".
   - Encoders and decoders also differ in training objective and data, not just architecture.
   - Against each model's standard similarity instruction, the fix costs Qwen3-8B 0.043 STS (validation); the no-STS-cost claim holds for e5-mistral and bge-gemma2 only.
-  - The original test cities have backed three frozen claim sets and the fresh-town test part one. Further claims need yet another held-out set.
+  - The original test cities have backed five frozen claim sets, the fresh-town test part four (fresh-v1, models-v1, size-v1, search-v1), and the small-town test part three (models-v1, size-v1, search-v2). Further claims need yet another held-out set.
+  - Station search passes the strict per-run rule only for the strongest models. The catalog's geolocation errors (247 stations) should be fixed at the source.
 - **Related work to position against** (found 2026-11-04): Feuerstein et al. 2026 (arXiv 2609.05721) recover geography from output embeddings with a few-seed projection and suggest geographic ranking. Their method is the natural baseline for our fix, and our country control is the main difference. Srinivasagan & Georges 2026 (arXiv 2609.00454) add coordinates through training, a contrast. Jiang et al. 2026 (arXiv 2605.12714) compare embedders and base LLMs layer by layer, without geography.
 - **Next for the paper:**
   1. Done (validation, fix-baselines-v1): the geographic wording, not instruction use, drives the gain; every component helps; Feuerstein et al.'s axes do not improve within-country neighbours. See `experiments/FIX_RUNS.md`.
   2. Done (fresh-v1): G1-G3 supported on fresh towns; see `experiments/FRESH_V1_RESULTS.md`.
   3. Done: full draft in `paper/` (two team TODOs left).
+  4. Done (Path B, 2026-11-05/06): five more models, the 1,000-4,999 band, model size and station search, all tested once; see above.
 
 ## Reproducing
 
